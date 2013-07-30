@@ -1,0 +1,1461 @@
+﻿///$tab Change Log
+let vVersion = '1.0.8';
+
+/*
+1.0.8.1 - 30/07/13
+------------------
+* Added check that vLocalTimeZone is recognised.
+* Moved to Github.
+
+1.0.8 - 25/06/13
+----------------
+* BREAKING CHANGES - You will not be able to simply start reloading this over the top of QVDs created from earlier versions.
+* Fixed issue where searchmaxpages in Params table should be maxNoPages
+* Removed RT and -RT as separate searches - this is now worked out from the presence/absence of a rewteeted status.
+* Added a Search_IsReply field (true/false).
+* Added a lot more fields to the search results table (and QVD) but only loading in a small subset of these. Feel free to uncomment more fields in the LoadFromQVDs table.
+* loadFromQVDs is now in a sub and called from Main.
+* Reply added as a TweetType and a new Search_IsRetweet field added if you just want to distinguish Tweets and Retweets.
+* Added show condition and message for keyword lookup.
+* Added a second tab where we are sketching out some ideas for new charts.
+* Added frequency to some list boxes.
+
+1.0.7 - 20/03/13
+----------------
+* Removed '$(grouping)' from UserLookup load, this was used incorrectly, this is now linked using a left join statement at the end when the QVD files are reloaded.
+* Fixed issue with rowKey parameter in search params table not being correctly in '' which meant issues linking data model when search term was an exact string, e.g. """business objects"""
+* Moved to three point version number.
+
+1.0.6.4 - 20/03/13
+------------------
+* Added new Minute calculated dimensions which shows hh:mm.
+* checkQVSource status script now also exits script if trying to reload in server mode without server licence.
+* Now skips blank search terms (shouldn't happen but an error in the config file was causing this in one instance).
+* Klout UserScore table renambed to UserScoreFromTwitterScreenName (this was already done in the background by QVSource but this is the real name for this table now).
+
+1.0.6.3 - 16/03/13
+------------------
+* Changed hashtag table column header to Hashtag.
+* Removed :ss from time column ion Tweet feed.
+* Fixed issue with naming of Keywords table.
+
+1.0.6.2 - 12/03/13
+------------------
+* Fixed issue introduced by adding vLang parameter to config file in previous update.
+
+1.0.6.1 - 01/03/13
+------------------
+* Added vLang parameter to config file.
+
+1.0.6.0 - 01/03/13
+------------------
+- BREAKING CHANGE - Updated to use Twitter v2 Connector. This means many column names have changed. This is not compatible with previous versions of the app without manually renaming tables and columns to match.
+- Now correctly uses Sentiment140 in place of TwitterSentiment in TextAnalyticsV2 Connector.
+- Fixed CheckQVSourceStatus function.
+
+1.0.5.2 - 04/02/13
+------------------
+- Moved to using processParams[Sync|Async] mechanism.
+- Added appID= into requests.
+- Moved to QVX requests.
+- Added CheckQVSourceStatus function and check.
+- Moved code into subs.
+- Now uses TextAnalyserV2
+
+1.0.5.1 - 121112
+----------------
+* Keyword lookup now uses Search_text_urlEncoded field instead of encoding Search_text in load script.
+* Minor rearrangements and comment updates to config file.
+
+1.0.5 - 081112
+--------------
+* Rearranged config file.
+* Added ability to turn on asynchronous sentiment analysis for improved performance (this means a change to 
+the config file as well as this app).
+* Added vGetKloutScores and vGetSentiment variables in case you want to just get Tweets.
+* Added MedialLinks table back into model when loaded from QVDs.
+
+1.0.4.2 - 270612
+----------------
+- uses new text_urlEncoded column instead of encoding this in script. This should not have changed end model 
+except for having this new field.
+
+1.0.4.1 - 080612
+----------------
+- vLocalReloadTime added to config file.
+- HashTag removed from HashTags table (having 2 subfield columns in this table was causing error in data).
+- Only Main tab now shown if vDropTmpTables='1'.
+
+1.0.4 - 070612
+--------------
+- Changed version numbering to 1.0.X - so now we are at 1.0.4.
+- added dropTableIfExists function so we no longer get errors when trying to delete non existent tables.
+- Moved vQVSourcePort into config file.
+
+1.1.3 - 310512
+--------------
+media_photo_count as Search_media_photo_count, media_photo_urls as Search_media_photo_urls added to Twitter search tables.
+MediaLinks table commented out and PhotoLinks table added to LoadFromQVDs tab.
+
+
+Still to Do
+-----------
+- 
+- Might be useful to be able to tune config file so searches for some search terms are run more frequently than others to make best use of API calls.
+- KPI which tracks Tweets per minute (TPM)?
+*/
+///$tab Setup
+SET ThousandSep=',';
+SET DecimalSep='.';
+SET MoneyThousandSep=',';
+SET MoneyDecimalSep='.';
+SET MoneyFormat='£#,##0.00;-£#,##0.00';
+SET TimeFormat='hh:mm:ss';
+SET DateFormat='DD/MM/YYYY';
+SET TimestampFormat='DD/MM/YYYY hh:mm:ss[.fff]';
+SET MonthNames='Jan;Feb;Mar;Apr;May;Jun;Jul;Aug;Sep;Oct;Nov;Dec';
+SET DayNames='Mon;Tue;Wed;Thu;Fri;Sat;Sun';
+
+$(include=config.txt);
+ 
+let vTestvLocalTimeZone = ConvertToLocalTime(UTC(), '$(vLocalTimeZone)');
+
+if (right(vTestvLocalTimeZone, 1) = '?') then
+	trace 'Your setting for vLocalTimeZone in the config file is not recognised as valid';
+	exit script;
+end if
+
+//
+// Reusable function to send email. Note that you will need to 
+// set the account details and smtp server in the connector's user interface for this 
+// to work server.
+//
+// Usage:
+// call sendEmail('test subject', 'test', $(emailNotificationAddress));
+//
+sub sendEmail(subject, msg, to)
+ 
+    NotificationConnector_SendEmail:
+    LOAD
+        sendemail_status as SendEmail_sendemail_status,
+        sendemail_result as SendEmail_sendemail_result
+    FROM
+    [http://localhost:$(vQVSourcePort)/QVSource/NotificationConnector/?table=SendEmail&subject=$(subject)&message=$(msg)&to=$(to)&appID=$(vQVSourceAppId)]
+    (txt, utf8, embedded labels, delimiter is '\t', msq);
+ 
+    drop table NotificationConnector_SendEmail; // Comment this out if you need to debug and see the results of the send attempt.
+     
+end sub
+
+let QVSource_log = '';
+
+sub logQVSourceError(errorDetails, connectorName)
+
+	if(not isnull(errorDetails)) then
+	
+		let QVSource_log = QVSource_log & connectorName & ' : ' & errorDetails & '<br />';
+	
+		QVSourceError:
+		LOAD QVSourceError_Timestamp,QVSourceError_Status,QVSourceError_Message
+		FROM [http://localhost:$(vQVSourcePort)/QVSource/?log=error,$(errorDetails),$(connectorName)]
+		(txt, utf8, embedded labels, delimiter is '\t', msq);
+		//drop table QVSourceError;
+		
+	endif
+
+end sub
+
+sub sendErrorSummary(a)
+
+	//
+	// Send email alert that this has been loaded. Note you will have to set up the email server 
+	// details in the Notifier Connector and the emailNotificationAddress variable in the config 
+	// file for this to work.
+	//
+	if (ScriptErrorCount > 0 or QVSource_log <> '') then
+	
+		if '$(vEmailNotificationAddress)' <> '' then
+		
+			let errorMessage = '';
+			
+			if(scripterrorlist <> '') then
+				let errorMessage = '<strong>scripterrorlist</strong> = ' & scripterrorlist & '<br/><br />';
+			end if
+			
+			errorMessage =  errorMessage & '<br/><br />';
+			
+			if(QVSource_log <> '') then
+				let errorMessage = errorMessage & '<strong>QVSource_log</strong>:<br />' & QVSource_log;
+			end if
+	
+			call sendEmail('$(vAppIdentifier)', '$(errorMessage)', '$(vEmailNotificationAddress)');
+			
+		endif
+	
+	end if
+
+end sub
+
+sub dropTableIfExists(tableName)
+
+	let vTableNo = TableNumber(tableName);
+
+	if not isnull(vTableNo) then
+		drop table '$(tableName)';
+	endif
+end sub
+
+sub CheckQVSourceStatus
+
+	set errormode = 0;
+	
+	QVSourceStatus:
+	LOAD Version,
+		SubField(Version, '.', 1) as Version_Major,
+		SubField(Version, '.', 2) as Version_Minor,
+		SubField(Version, '.', 3) as Version_Build,
+		SubField(Version, '.', 4) as Version_Revision,
+		ServerMode,
+		Path,
+		Licensed,
+		LicenseExpires,
+		IsLicensedAsServer
+	FROM [http://localhost:$(vQVSourcePort)/QVSource?format=xml] (XmlSimple, Table is [QVSource]);
+         
+	if(ScriptError <> '') then   
+		//
+		// Looks like QVSOurce is not even running.
+		//
+		// Log message here or send email using QVSource Notifier Connector
+		//
+		trace 'QVSource is not running or not running on the requested port number.';
+		exit script;
+	endif
+	
+	if(peek('ServerMode', 0, 'QVSourceStatus') = 'true' and peek('IsLicensedAsServer', 0, 'QVSourceStatus') <> 'true') then
+		//
+		// QVSource is running but not licensed to run in server mode.
+		//
+		// Log message here or send email using QVSource Notifier Connector
+		//
+		trace 'QVSource is running but not licensed to run in server mode.';
+		exit script;
+	endif     
+     
+	if(peek('Licensed', 0, 'QVSourceStatus') <> 'true') then
+		//
+		// QVSource is running but not licensed.
+		//
+		// Log message here or send email using QVSource Notifier Connector
+		//
+		trace 'QVSource is running but not licensed.';
+		exit script;
+	endif
+    
+	let currentVersionAsInt = (peek('Version_Major', 0, 'QVSourceStatus') * 1000) + (peek('Version_Minor', 0, 'QVSourceStatus') * 100) + (peek('Version_Build', 0, 'QVSourceStatus') * 10) + peek('Version_Revision', 0, 'QVSourceStatus');
+ 
+    // Let's pretend we need QVSource 1.4.2.6 or later....  
+    if(currentVersionAsInt < 1428) then
+        // Log message here or send email using QVSource Notifier Connector
+        trace 'Version too low. Please update QVSource.';
+        exit script;
+    endif
+	
+//	QVSourceConnectorStatus:
+//	LOAD Name as ConnectorName,
+//	    Version as ConnectorVersion,
+//	    Licensed as ConnectorLicensed
+//	FROM [http://localhost:$(vQVSourcePort)/QVSource?format=xml] (XmlSimple, Table is [QVSource/Connectors/Connector]);
+	
+	//
+	// Run other QVSource or connector specific tests here before deciding whether
+	// to proceed and load the rest of the application.
+	//
+	
+	drop table QVSourceStatus;
+	//drop table QVSourceConnectorStatus;
+	
+	set errormode = 1;
+
+endsub
+///$tab Tracked Accounts
+sub getTrackedTwitterAccountsInfo
+	
+	let qvd = 'TrackedTwitterAccounts.qvd';
+	
+	let size = filesize('$(qvd)');
+	
+	if not isnull(size) then
+		TrackedTwitterAccounts:
+		LOAD
+		* 
+		FROM '$(qvd)' (qvd);
+	end if
+	
+	if not isnull( filesize('TrackedTwitterAccounts_Klout.qvd')) then
+		TrackedTwitterAccounts_Klout:
+		LOAD * FROM 'TrackedTwitterAccounts_Klout.qvd' (qvd);
+	end if
+	
+	LET noRows = NoOfRows('TwitterAccountsToTrack');
+	
+	let concatenated = '';
+	let currentCount = 0;
+	
+	if not IsNull(noRows) then
+		
+		set errormode=0;
+		   
+		for i=0 to $(noRows)-1
+		
+			let account = Replace(peek('TwitterAccount',$(i),'TwitterAccountsToTrack'), '@', '');
+			let grouping = peek('Grouping',$(i),'TwitterAccountsToTrack');
+								
+		  	let sep = ',';
+		     
+		    if(concatenated = '') then
+		        let sep = '';
+		    endif
+		     
+		    let concatenated = concatenated & sep & account;
+		    let currentCount = currentCount + 1;
+		  
+		  	// We don't actually need to handle splitting these into groups of 100 or less anymore as the connector does this internally
+		  	// but have left this in for now.
+			if(currentCount >= 99 or i=($(noRows)-1)) then
+					    
+				TrackedTwitterAccounts:
+				LOAD
+					timestamp(now(1)) as TrackedTwitterAccounts_timestamp,
+					user_id as TrackedTwitterAccounts_user_id,
+					user_name as TrackedTwitterAccounts_user_name,
+					user_screen_name as TrackedTwitterAccounts_user_screen_name,
+					lower(user_screen_name) as TrackedTwitterAccounts_user_screen_name_LOWERED,
+					user_profile_image_url as TrackedTwitterAccounts_user_profile_image_url,
+					user_location as TrackedTwitterAccounts_user_location,
+					user_description as TrackedTwitterAccounts_user_description,
+					user_url as TrackedTwitterAccounts_user_url,
+					user_geo_enabled as TrackedTwitterAccounts_user_geo_enabled,
+					user_protected as TrackedTwitterAccounts_user_protected,
+					user_followers_count as TrackedTwitterAccounts_user_followers_count,
+					user_friends_count as TrackedTwitterAccounts_user_friends_count,
+					user_listed_count as TrackedTwitterAccounts_user_listed_count,
+					user_favourites_count as TrackedTwitterAccounts_user_favourites_count,
+					user_statuses_count as TrackedTwitterAccounts_user_statuses_count,
+					user_created_at as TrackedTwitterAccounts_user_created_at,
+					timestamp#(mid(user_created_at, 9, 2) & '-' & mid(user_created_at, 5, 3) & '-' & mid(user_created_at, 27, 4) & ' ' & mid(user_created_at, 12, 8), 'DD-MMM-YYYY hh:mm:ss') as TrackedTwitterAccounts_user_created_at_timestamp,
+					date#(mid(user_created_at, 9, 2) & '-' & mid(user_created_at, 5, 3) & '-' & mid(user_created_at, 27, 4), 'DD-MMM-YYYY') as TrackedTwitterAccounts_user_created_at_date,
+					time#(mid(user_created_at, 12, 8), 'hh:mm:ss') as TrackedTwitterAccounts_user_created_at_time,
+					user_utc_offset as TrackedTwitterAccounts_user_utc_offset,
+					user_time_zone as TrackedTwitterAccounts_user_time_zone,
+					user_verified as TrackedTwitterAccounts_user_verified,
+					user_lang as TrackedTwitterAccounts_user_lang,
+					user_follow_request_sent as TrackedTwitterAccounts_user_follow_request_sent,
+					user_is_translator as TrackedTwitterAccounts_user_is_translator,
+					user_following as TrackedTwitterAccounts_user_following,
+					user_notifications as TrackedTwitterAccounts_user_notifications,
+					status_id as TrackedTwitterAccounts_status_id,
+					status_created_at as TrackedTwitterAccounts_status_created_at,
+					timestamp#(mid(status_created_at, 9, 2) & '-' & mid(status_created_at, 5, 3) & '-' & mid(status_created_at, 27, 4) & ' ' & mid(status_created_at, 12, 8), 'DD-MMM-YYYY hh:mm:ss') as TrackedTwitterAccounts_status_created_at_timestamp,
+					date#(mid(status_created_at, 9, 2) & '-' & mid(status_created_at, 5, 3) & '-' & mid(status_created_at, 27, 4), 'DD-MMM-YYYY') as TrackedTwitterAccounts_status_created_at_date,
+					time#(mid(status_created_at, 12, 8), 'hh:mm:ss') as TrackedTwitterAccounts_status_created_at_time,
+					status_text as TrackedTwitterAccounts_status_text,
+					status_lang as TrackedTwitterAccounts_status_lang,
+					status_source as TrackedTwitterAccounts_status_source,
+					status_truncated as TrackedTwitterAccounts_status_truncated,
+					status_in_reply_to_screen_name as TrackedTwitterAccounts_status_in_reply_to_screen_name,
+					status_in_reply_to_status_id as TrackedTwitterAccounts_status_in_reply_to_status_id,
+					status_in_reply_to_user_id as TrackedTwitterAccounts_status_in_reply_to_user_id,
+					status_retweet_count as TrackedTwitterAccounts_status_retweet_count,
+					status_retweeted as TrackedTwitterAccounts_status_retweeted,
+					status_favorited as TrackedTwitterAccounts_status_favorited,
+					status_possibly_sensitive as TrackedTwitterAccounts_status_possibly_sensitive,
+					status_hashtag_count as TrackedTwitterAccounts_status_hashtag_count,
+					status_hash_tags as TrackedTwitterAccounts_status_hash_tags,
+					status_url_count as TrackedTwitterAccounts_status_url_count,
+					status_expanded_urls as TrackedTwitterAccounts_status_expanded_urls,
+					status_user_mentions_count as TrackedTwitterAccounts_status_user_mentions_count,
+					status_user_mentions as TrackedTwitterAccounts_status_user_mentions,
+					status_media_count as TrackedTwitterAccounts_status_media_count,
+					status_media_expanded_urls as TrackedTwitterAccounts_status_media_expanded_urls,
+					status_media_photo_count as TrackedTwitterAccounts_status_media_photo_count,
+					status_media_photo_urls as TrackedTwitterAccounts_status_media_photo_urls,
+					status_place_id as TrackedTwitterAccounts_status_place_id,
+					status_place_url as TrackedTwitterAccounts_status_place_url,
+					status_place_place_type as TrackedTwitterAccounts_status_place_place_type,
+					status_place_name as TrackedTwitterAccounts_status_place_name,
+					status_place_full_name as TrackedTwitterAccounts_status_place_full_name,
+					status_place_country_code as TrackedTwitterAccounts_status_place_country_code,
+					status_place_country as TrackedTwitterAccounts_status_place_country,
+					status_place_bounding_box_type as TrackedTwitterAccounts_status_place_bounding_box_type,
+					status_place_attributes as TrackedTwitterAccounts_status_place_attributes,
+					status_geo_type as TrackedTwitterAccounts_status_geo_type,
+					status_geo_latitude as TrackedTwitterAccounts_status_geo_latitude,
+					status_geo_longitude as TrackedTwitterAccounts_status_geo_longitude,
+					status_coordinates_type as TrackedTwitterAccounts_status_coordinates_type,
+					status_coordinates_latitude as TrackedTwitterAccounts_status_coordinates_latitude,
+					status_coordinates_longitude as TrackedTwitterAccounts_status_coordinates_longitude,
+					status_retweeted_status_id as TrackedTwitterAccounts_status_retweeted_status_id,
+					status_retweeted_status_created_at as TrackedTwitterAccounts_status_retweeted_status_created_at,
+					timestamp#(mid(status_retweeted_status_created_at, 9, 2) & '-' & mid(status_retweeted_status_created_at, 5, 3) & '-' & mid(status_retweeted_status_created_at, 27, 4) & ' ' & mid(status_retweeted_status_created_at, 12, 8), 'DD-MMM-YYYY hh:mm:ss') as TrackedTwitterAccounts_status_retweeted_status_created_at_timestamp,
+					date#(mid(status_retweeted_status_created_at, 9, 2) & '-' & mid(status_retweeted_status_created_at, 5, 3) & '-' & mid(status_retweeted_status_created_at, 27, 4), 'DD-MMM-YYYY') as TrackedTwitterAccounts_status_retweeted_status_created_at_date,
+					time#(mid(status_retweeted_status_created_at, 12, 8), 'hh:mm:ss') as TrackedTwitterAccounts_status_retweeted_status_created_at_time,
+					status_retweeted_status_text as TrackedTwitterAccounts_status_retweeted_status_text,
+					status_retweeted_status_lang as TrackedTwitterAccounts_status_retweeted_status_lang,
+					status_retweeted_status_source as TrackedTwitterAccounts_status_retweeted_status_source,
+					status_retweeted_status_truncated as TrackedTwitterAccounts_status_retweeted_status_truncated,
+					status_retweeted_status_in_reply_to_screen_name as TrackedTwitterAccounts_status_retweeted_status_in_reply_to_screen_name,
+					status_retweeted_status_in_reply_to_status_id as TrackedTwitterAccounts_status_retweeted_status_in_reply_to_status_id,
+					status_retweeted_status_in_reply_to_user_id as TrackedTwitterAccounts_status_retweeted_status_in_reply_to_user_id,
+					status_retweeted_status_retweet_count as TrackedTwitterAccounts_status_retweeted_status_retweet_count,
+					status_retweeted_status_retweeted as TrackedTwitterAccounts_status_retweeted_status_retweeted,
+					status_retweeted_status_favorited as TrackedTwitterAccounts_status_retweeted_status_favorited,
+					status_retweeted_status_possibly_sensitive as TrackedTwitterAccounts_status_retweeted_status_possibly_sensitive,
+					status_retweeted_status_hashtag_count as TrackedTwitterAccounts_status_retweeted_status_hashtag_count,
+					status_retweeted_status_hash_tags as TrackedTwitterAccounts_status_retweeted_status_hash_tags,
+					status_retweeted_status_url_count as TrackedTwitterAccounts_status_retweeted_status_url_count,
+					status_retweeted_status_expanded_urls as TrackedTwitterAccounts_status_retweeted_status_expanded_urls,
+					status_retweeted_status_user_mentions_count as TrackedTwitterAccounts_status_retweeted_status_user_mentions_count,
+					status_retweeted_status_user_mentions as TrackedTwitterAccounts_status_retweeted_status_user_mentions,
+					status_retweeted_status_media_count as TrackedTwitterAccounts_status_retweeted_status_media_count,
+					status_retweeted_status_media_expanded_urls as TrackedTwitterAccounts_status_retweeted_status_media_expanded_urls,
+					status_retweeted_status_media_photo_count as TrackedTwitterAccounts_status_retweeted_status_media_photo_count,
+					status_retweeted_status_media_photo_urls as TrackedTwitterAccounts_status_retweeted_status_media_photo_urls,
+					status_retweeted_status_place_id as TrackedTwitterAccounts_status_retweeted_status_place_id,
+					status_retweeted_status_place_url as TrackedTwitterAccounts_status_retweeted_status_place_url,
+					status_retweeted_status_place_place_type as TrackedTwitterAccounts_status_retweeted_status_place_place_type,
+					status_retweeted_status_place_name as TrackedTwitterAccounts_status_retweeted_status_place_name,
+					status_retweeted_status_place_full_name as TrackedTwitterAccounts_status_retweeted_status_place_full_name,
+					status_retweeted_status_place_country_code as TrackedTwitterAccounts_status_retweeted_status_place_country_code,
+					status_retweeted_status_place_country as TrackedTwitterAccounts_status_retweeted_status_place_country,
+					status_retweeted_status_place_bounding_box_type as TrackedTwitterAccounts_status_retweeted_status_place_bounding_box_type,
+					status_retweeted_status_place_attributes as TrackedTwitterAccounts_status_retweeted_status_place_attributes,
+					status_retweeted_status_geo_type as TrackedTwitterAccounts_status_retweeted_status_geo_type,
+					status_retweeted_status_geo_latitude as TrackedTwitterAccounts_status_retweeted_status_geo_latitude,
+					status_retweeted_status_geo_longitude as TrackedTwitterAccounts_status_retweeted_status_geo_longitude,
+					status_retweeted_status_coordinates_type as TrackedTwitterAccounts_status_retweeted_status_coordinates_type,
+					status_retweeted_status_coordinates_latitude as TrackedTwitterAccounts_status_retweeted_status_coordinates_latitude,
+					status_retweeted_status_coordinates_longitude as TrackedTwitterAccounts_status_retweeted_status_coordinates_longitude
+				FROM
+				[http://localhost:$(vQVSourcePort)/QVSource/TwitterConnectorV2/?table=UserLookup&userNames=$(concatenated)&fixedcolumns=false&format=qvx&appID=$(vQVSourceAppId)&maxCacheAgeInHours=-1]
+				(qvx);
+				
+			    //call logQVSourceError(scripterrordetails, 'TwitterConnectorV2\UserLookup');
+			    	    
+				let concatenated = '';
+				let currentCount = 0;
+						
+			endif
+			
+		next
+				
+		Params:
+		load
+		TwitterAccount as TwitterId,
+		TwitterAccount as rowKey
+		resident
+		TwitterAccountsToTrack;
+		
+		if(NoOfRows('Params') > 0) then
+		
+			let vParamsFile = '$(vWorkingFolder)$(vQVSourceAppId)' & '_TrackedAccountsKlout.txt';
+			
+			store Params into '$(vParamsFile)' (txt);
+			drop table Params;
+		
+			TrackedTwitterAccounts_Klout:
+			LOAD
+				rowKey as TwitterAccount,
+				timestamp(now(1)) as TrackedTwitterAccounts_Klout_timestamp,
+				status as TrackedTwitterAccounts_Klout_status,
+				score as TrackedTwitterAccounts_Klout_score,
+				dayChange as TrackedTwitterAccounts_Klout_dayChange,
+				weekChange as TrackedTwitterAccounts_Klout_weekChange,
+				monthChange as TrackedTwitterAccounts_Klout_monthChange,
+				QVSourceFromCache as TrackedTwitterAccounts_Klout_QVSourceFromCache,
+				QVSourceCachedAt as TrackedTwitterAccounts_Klout_QVSourceCachedAt
+			FROM
+			[http://localhost:$(vQVSourcePort)/QVSource/KloutConnectorV2/?table=UserScoreFromTwitterScreenName&processParamsAsync=$(vParamsFile)&appID=$(vQVSourceAppId)&cacheAgeInHours=1&format=qvx&appID=$(vQVSourceAppId)]
+			(qvx);
+			
+		endif
+		
+		//call logQVSourceError(scripterrordetails, 'KloutConnectorV2\UserScore [$(account)]');
+		
+	endif
+	
+	STORE TrackedTwitterAccounts INTO '$(qvd)';
+	store TrackedTwitterAccounts_Klout into 'TrackedTwitterAccounts_Klout.qvd';
+				
+	drop Table TrackedTwitterAccounts;
+	drop table TrackedTwitterAccounts_Klout;
+	
+endsub
+///$tab Twitter Search
+sub getLatestId(searchTerm)
+
+	let latestId = '';
+	
+	Trace 'Getting latestId for search term $(searchTerm)...';
+	
+	if(not isnull(TableNumber('TwitterSearch'))) then
+	
+		qualify *;
+		temp:
+		LOAD
+		Search_id
+		RESIDENT TwitterSearch
+		where SearchTerm='$(searchTerm)'// and TweetType='$(type)' 
+		order by Search_id desc;
+		unqualify *;
+		
+		let latestId = PEEK('temp.Search_id', 0, 'temp');
+
+		Trace 'latestId for search term $(searchTerm) is $(latestId)';
+			
+		call=latestId;
+				
+		DROP TABLE temp;
+			
+	endif
+
+endsub
+
+sub getSearchResults
+
+	let allTweets = 'SearchResults.qvd';
+	
+	let size = filesize('$(allTweets)');
+	
+	if not isnull(size) then
+		TwitterSearch:
+		LOAD
+		* 
+		FROM '$(allTweets)' (qvd);
+	end if
+	
+	let latestId = '';
+	
+	LET noRows = NoOfRows('TwitterSearchTerms');
+	
+	set errormode=0;
+	
+	for i=0 to $(noRows)-1
+	
+		let vSearchTerm = peek('SearchTerm',$(i),'TwitterSearchTerms');
+		
+		if(vSearchTerm = '') then 
+			Trace 'Empty search term, skipping....';
+		else
+			call getLatestId('$(vSearchTerm)');	
+		
+			Params:
+			LOAD * INLINE [
+			since_id, 		maxNoPages, 				searchTerm, 		lang,			rowKey, 			
+			$(latestId), 	$(vMaxTwitterSearchPages), 	'$(vSearchTerm)', 	$(vLang),		'$(vSearchTerm)'
+			];
+			
+		endif
+		
+	next
+	
+	let vParamsFile = '$(vWorkingFolder)$(vQVSourceAppId)' & '_SearchTerms.txt';
+	
+	store Params into '$(vParamsFile)' (txt);
+	let vNoSearchRequests = NoOfRows('Params');
+	
+//	exit script;
+	
+	drop table Params;
+	
+	Trace 'About to run $(vNoSearchRequests) searches in parallel/async mode...';
+	
+	TwitterSearch:
+	LOAD
+//		rowKey as SearchTerm,
+//		rowKey & '_' & id as SearchTerm_key,
+//		//rowKey2 as TweetType,
+//		//rowKey1 & '_' & rowKey & '_' & id as SearchTerm_key,
+//		timestamp(now(1)) as Search_loaded_timestamp,	    
+//		id as Search_id,
+//		created_at as Search_created_at,
+//		timestamp#(mid(created_at, 9, 2) & '-' & mid(created_at, 5, 3) & '-' & mid(created_at, 27, 4) & ' ' & mid(created_at, 12, 8), 'DD-MMM-YYYY hh:mm:ss') as Search_created_at_timestamp,
+//		date#(mid(created_at, 9, 2) & '-' & mid(created_at, 5, 3) & '-' & mid(created_at, 27, 4), 'DD-MMM-YYYY') as Search_created_at_date,
+//		time#(mid(created_at, 12, 8), 'hh:mm:ss') as Search_created_at_time,
+//		text as Search_text,
+//		text_urlEncoded as Search_text_urlEncoded,
+//		lang as Search_lang,
+//		source as Search_source,
+//		truncated as Search_truncated,
+//		in_reply_to_screen_name as Search_in_reply_to_screen_name,
+//		in_reply_to_status_id as Search_in_reply_to_status_id,
+//		in_reply_to_user_id as Search_in_reply_to_user_id,
+//		retweet_count as Search_retweet_count,
+//		retweeted as Search_retweeted,
+//		favorited as Search_favorited,
+//		possibly_sensitive as Search_possibly_sensitive,
+//		hashtag_count as Search_hashtag_count,
+//		hash_tags as Search_hash_tags,
+//		url_count as Search_url_count,
+//		expanded_urls as Search_expanded_urls,
+//		user_mentions_count as Search_user_mentions_count,
+//		user_mentions as Search_user_mentions,
+//		media_count as Search_media_count,
+//		media_expanded_urls as Search_media_expanded_urls,
+//		media_photo_count as Search_media_photo_count,
+//		media_photo_urls as Search_media_photo_urls,
+//		metadata_result_type as Search_metadata_result_type,
+//		metadata_iso_language_code as Search_metadata_iso_language_code,
+//		user_id as Search_user_id,
+//		user_name as Search_user_name,
+//		user_profile_image_url as Search_user_profile_image_url,
+//		user_screen_name as Search_user_screen_name,
+//		user_location as Search_user_location,
+//		user_description as Search_user_description,
+//		user_url as Search_user_url,
+//		user_geo_enabled as Search_user_geo_enabled,
+//		user_protected as Search_user_protected,
+//		user_followers_count as Search_user_followers_count,
+//		user_friends_count as Search_user_friends_count,
+//		user_listed_count as Search_user_listed_count,
+//		user_favourites_count as Search_user_favourites_count,
+//		user_statuses_count as Search_user_statuses_count,
+//		user_created_at as Search_user_created_at,
+//		timestamp#(mid(created_at, 9, 2) & '-' & mid(created_at, 5, 3) & '-' & mid(created_at, 27, 4) & ' ' & mid(created_at, 12, 8), 'DD-MMM-YYYY hh:mm:ss') as Search_user_created_at_timestamp,
+//		date#(mid(created_at, 9, 2) & '-' & mid(created_at, 5, 3) & '-' & mid(created_at, 27, 4), 'DD-MMM-YYYY') as Search_user_created_at_date,
+//		time#(mid(created_at, 12, 8), 'hh:mm:ss') as Search_user_created_at_time,
+//		user_utc_offset as Search_user_utc_offset,
+//		user_time_zone as Search_user_time_zone,
+//		user_verified as Search_user_verified,
+//		user_lang as Search_user_lang,
+//		user_follow_request_sent as Search_user_follow_request_sent,
+//		user_is_translator as Search_user_is_translator,
+//		user_following as Search_user_following,
+//		user_notifications as Search_user_notifications
+
+		rowKey as SearchTerm,
+		rowKey & '_' & id as SearchTerm_key,
+		timestamp(now(1)) as Search_loaded_timestamp,	    
+		id as Search_id,
+		created_at as Search_created_at,
+		timestamp#(mid(created_at, 9, 2) & '-' & mid(created_at, 5, 3) & '-' & mid(created_at, 27, 4) & ' ' & mid(created_at, 12, 8), 'DD-MMM-YYYY hh:mm:ss') as Search_created_at_timestamp,
+		date#(mid(created_at, 9, 2) & '-' & mid(created_at, 5, 3) & '-' & mid(created_at, 27, 4), 'DD-MMM-YYYY') as Search_created_at_date,
+		time#(mid(created_at, 12, 8), 'hh:mm:ss') as Search_created_at_time,
+		text as Search_text,
+		text_urlEncoded as Search_text_urlEncoded,
+		lang as Search_lang,
+		source as Search_source,
+		truncated as Search_truncated,
+		in_reply_to_screen_name as Search_in_reply_to_screen_name,
+		in_reply_to_status_id as Search_in_reply_to_status_id,
+		in_reply_to_user_id as Search_in_reply_to_user_id,
+		retweet_count as Search_retweet_count,
+		favorite_count as Search_favorite_count,
+		retweeted as Search_retweeted,
+		favorited as Search_favorited,
+		possibly_sensitive as Search_possibly_sensitive,
+		hashtag_count as Search_hashtag_count,
+		hash_tags as Search_hash_tags,
+		url_count as Search_url_count,
+		expanded_urls as Search_expanded_urls,
+		user_mentions_count as Search_user_mentions_count,
+		user_mentions as Search_user_mentions,
+		media_count as Search_media_count,
+		media_expanded_urls as Search_media_expanded_urls,
+		symbols_count as Search_symbols_count,
+		symbols as Search_symbols,
+		media_photo_count as Search_media_photo_count,
+		media_photo_urls as Search_media_photo_urls,
+		metadata_result_type as Search_metadata_result_type,
+		metadata_iso_language_code as Search_metadata_iso_language_code,
+		user_id as Search_user_id,
+		user_name as Search_user_name,
+		user_screen_name as Search_user_screen_name,
+		user_location as Search_user_location,
+		user_profile_image_url as Search_user_profile_image_url,
+		user_description as Search_user_description,
+		user_url as Search_user_url,
+		user_geo_enabled as Search_user_geo_enabled,
+		user_protected as Search_user_protected,
+		user_followers_count as Search_user_followers_count,
+		user_friends_count as Search_user_friends_count,
+		user_listed_count as Search_user_listed_count,
+		user_favourites_count as Search_user_favourites_count,
+		user_statuses_count as Search_user_statuses_count,
+		user_created_at as Search_user_created_at,
+		timestamp#(mid(user_created_at, 9, 2) & '-' & mid(user_created_at, 5, 3) & '-' & mid(user_created_at, 27, 4) & ' ' & mid(user_created_at, 12, 8), 'DD-MMM-YYYY hh:mm:ss') as Search_user_user_created_at_timestamp,
+		date#(mid(user_created_at, 9, 2) & '-' & mid(user_created_at, 5, 3) & '-' & mid(user_created_at, 27, 4), 'DD-MMM-YYYY') as Search_user_user_created_at_date,
+		time#(mid(user_created_at, 12, 8), 'hh:mm:ss') as Search_user_user_created_at_time,
+		user_utc_offset as Search_user_utc_offset,
+		user_time_zone as Search_user_time_zone,
+		user_verified as Search_user_verified,
+		user_lang as Search_user_lang,
+		user_follow_request_sent as Search_user_follow_request_sent,
+		user_is_translator as Search_user_is_translator,
+		user_following as Search_user_following,
+		user_notifications as Search_user_notifications,
+		place_id as Search_place_id,
+		place_url as Search_place_url,
+		place_place_type as Search_place_place_type,
+		place_name as Search_place_name,
+		place_full_name as Search_place_full_name,
+		place_country_code as Search_place_country_code,
+		place_country as Search_place_country,
+		place_bounding_box_type as Search_place_bounding_box_type,
+		place_attributes as Search_place_attributes,
+		geo_type as Search_geo_type,
+		geo_latitude as Search_geo_latitude,
+		geo_longitude as Search_geo_longitude,
+		coordinates_type as Search_coordinates_type,
+		coordinates_latitude as Search_coordinates_latitude,
+		coordinates_longitude as Search_coordinates_longitude,
+		retweeted_status_id as Search_retweeted_status_id,
+		retweeted_status_created_at as Search_retweeted_status_created_at,
+		timestamp#(mid(retweeted_status_created_at, 9, 2) & '-' & mid(retweeted_status_created_at, 5, 3) & '-' & mid(retweeted_status_created_at, 27, 4) & ' ' & mid(retweeted_status_created_at, 12, 8), 'DD-MMM-YYYY hh:mm:ss') as Search_retweeted_status_retweeted_status_created_at_timestamp,
+		date#(mid(retweeted_status_created_at, 9, 2) & '-' & mid(retweeted_status_created_at, 5, 3) & '-' & mid(retweeted_status_created_at, 27, 4), 'DD-MMM-YYYY') as Search_retweeted_status_retweeted_status_created_at_date,
+		time#(mid(retweeted_status_created_at, 12, 8), 'hh:mm:ss') as Search_retweeted_status_retweeted_status_created_at_time,
+		retweeted_status_text as Search_retweeted_status_text,
+		retweeted_status_text_urlEncoded as Search_retweeted_status_text_urlEncoded,
+		retweeted_status_lang as Search_retweeted_status_lang,
+		retweeted_status_source as Search_retweeted_status_source,
+		retweeted_status_truncated as Search_retweeted_status_truncated,
+		retweeted_status_in_reply_to_screen_name as Search_retweeted_status_in_reply_to_screen_name,
+		retweeted_status_in_reply_to_status_id as Search_retweeted_status_in_reply_to_status_id,
+		retweeted_status_in_reply_to_user_id as Search_retweeted_status_in_reply_to_user_id,
+		retweeted_status_retweet_count as Search_retweeted_status_retweet_count,
+		retweeted_status_favorite_count as Search_retweeted_status_favorite_count,
+		retweeted_status_retweeted as Search_retweeted_status_retweeted,
+		retweeted_status_favorited as Search_retweeted_status_favorited,
+		retweeted_status_possibly_sensitive as Search_retweeted_status_possibly_sensitive,
+		retweeted_status_hashtag_count as Search_retweeted_status_hashtag_count,
+		retweeted_status_hash_tags as Search_retweeted_status_hash_tags,
+		retweeted_status_url_count as Search_retweeted_status_url_count,
+		retweeted_status_expanded_urls as Search_retweeted_status_expanded_urls,
+		retweeted_status_user_mentions_count as Search_retweeted_status_user_mentions_count,
+		retweeted_status_user_mentions as Search_retweeted_status_user_mentions,
+		retweeted_status_media_count as Search_retweeted_status_media_count,
+		retweeted_status_media_expanded_urls as Search_retweeted_status_media_expanded_urls,
+		retweeted_status_symbols_count as Search_retweeted_status_symbols_count,
+		retweeted_status_symbols as Search_retweeted_status_symbols,
+		retweeted_status_media_photo_count as Search_retweeted_status_media_photo_count,
+		retweeted_status_media_photo_urls as Search_retweeted_status_media_photo_urls,
+		retweeted_status_metadata_result_type as Search_retweeted_status_metadata_result_type,
+		retweeted_status_metadata_iso_language_code as Search_retweeted_status_metadata_iso_language_code,
+		retweeted_status_user_id as Search_retweeted_status_user_id,
+		retweeted_status_user_name as Search_retweeted_status_user_name,
+		retweeted_status_user_screen_name as Search_retweeted_status_user_screen_name,
+		retweeted_status_user_location as Search_retweeted_status_user_location,
+		retweeted_status_user_profile_image_url as Search_retweeted_status_user_profile_image_url,
+		retweeted_status_user_description as Search_retweeted_status_user_description,
+		retweeted_status_user_url as Search_retweeted_status_user_url,
+		retweeted_status_user_geo_enabled as Search_retweeted_status_user_geo_enabled,
+		retweeted_status_user_protected as Search_retweeted_status_user_protected,
+		retweeted_status_user_followers_count as Search_retweeted_status_user_followers_count,
+		retweeted_status_user_friends_count as Search_retweeted_status_user_friends_count,
+		retweeted_status_user_listed_count as Search_retweeted_status_user_listed_count,
+		retweeted_status_user_favourites_count as Search_retweeted_status_user_favourites_count,
+		retweeted_status_user_statuses_count as Search_retweeted_status_user_statuses_count,
+		retweeted_status_user_created_at as Search_retweeted_status_user_created_at,
+		timestamp#(mid(retweeted_status_user_created_at, 9, 2) & '-' & mid(retweeted_status_user_created_at, 5, 3) & '-' & mid(retweeted_status_user_created_at, 27, 4) & ' ' & mid(retweeted_status_user_created_at, 12, 8), 'DD-MMM-YYYY hh:mm:ss') as Search_retweeted_status_user_retweeted_status_user_created_at_timestamp,
+		date#(mid(retweeted_status_user_created_at, 9, 2) & '-' & mid(retweeted_status_user_created_at, 5, 3) & '-' & mid(retweeted_status_user_created_at, 27, 4), 'DD-MMM-YYYY') as Search_retweeted_status_user_retweeted_status_user_created_at_date,
+		time#(mid(retweeted_status_user_created_at, 12, 8), 'hh:mm:ss') as Search_retweeted_status_user_retweeted_status_user_created_at_time,
+		retweeted_status_user_utc_offset as Search_retweeted_status_user_utc_offset,
+		retweeted_status_user_time_zone as Search_retweeted_status_user_time_zone,
+		retweeted_status_user_verified as Search_retweeted_status_user_verified,
+		retweeted_status_user_lang as Search_retweeted_status_user_lang,
+		retweeted_status_user_follow_request_sent as Search_retweeted_status_user_follow_request_sent,
+		retweeted_status_user_is_translator as Search_retweeted_status_user_is_translator,
+		retweeted_status_user_following as Search_retweeted_status_user_following,
+		retweeted_status_user_notifications as Search_retweeted_status_user_notifications,
+		retweeted_status_place_id as Search_retweeted_status_place_id,
+		retweeted_status_place_url as Search_retweeted_status_place_url,
+		retweeted_status_place_place_type as Search_retweeted_status_place_place_type,
+		retweeted_status_place_name as Search_retweeted_status_place_name,
+		retweeted_status_place_full_name as Search_retweeted_status_place_full_name,
+		retweeted_status_place_country_code as Search_retweeted_status_place_country_code,
+		retweeted_status_place_country as Search_retweeted_status_place_country,
+		retweeted_status_place_bounding_box_type as Search_retweeted_status_place_bounding_box_type,
+		retweeted_status_place_attributes as Search_retweeted_status_place_attributes,
+		retweeted_status_geo_type as Search_retweeted_status_geo_type,
+		retweeted_status_geo_latitude as Search_retweeted_status_geo_latitude,
+		retweeted_status_geo_longitude as Search_retweeted_status_geo_longitude,
+		retweeted_status_coordinates_type as Search_retweeted_status_coordinates_type,
+		retweeted_status_coordinates_latitude as Search_retweeted_status_coordinates_latitude,
+		retweeted_status_coordinates_longitude as Search_retweeted_status_coordinates_longitude		
+	FROM
+	[http://localhost:$(vQVSourcePort)/QVSource/TwitterConnectorV2/?table=SearchAdvanced&processParamsAsync=$(vParamsFile)&format=qvx&appID=$(vQVSourceAppId)]
+	(qvx)
+	where not exists ('SearchTerm_key', rowKey & '_' & id );
+	
+	STORE TwitterSearch INTO '$(allTweets)';
+		
+	STORE TwitterSearchTerms INTO 'TwitterSearchTerms.qvd';
+	STORE TwitterAccountsToTrack INTO 'TwitterAccountsToTrack.qvd';
+	
+	drop table TwitterSearchTerms;
+//	drop table TwitterAccountsToTrack;
+
+endsub
+///$tab Klout
+sub getKloutScores
+	
+	if vGetKloutScores <> 1 then
+		exit sub
+	endif
+		
+	let qvdKlout = 'Klout.qvd';
+	
+	let size = filesize('$(qvdKlout)');
+	
+	if not isnull(size) then
+		Klout:
+		LOAD
+		* 
+		FROM '$(qvdKlout)' (qvd);
+		
+		AllUsers:
+		load
+		Search_user_screen_name as AllUsers_user
+		resident
+		TwitterSearch;
+		
+		outer join load
+		Search_user_screen_name as AllUsers_user,
+		KloutScore_score as AllUsers_score,
+		KloutScore_timestamp as AllUsers_timestamp
+		resident
+		Klout;
+		
+		StillToScoreForKlout:
+		load distinct
+		AllUsers_user as StillToScoreForKlout_user
+		resident
+		AllUsers
+		where isnull(AllUsers_score);
+		
+		if(vDropTmpTables = 1) then
+			drop Table AllUsers;
+		endif
+	
+	else
+		StillToScoreForKlout:
+		load distinct
+		Search_user_screen_name as StillToScoreForKlout_user
+		resident
+		TwitterSearch;
+	end if
+	
+	LET noRows = fieldvaluecount('StillToScoreForKlout_user');
+			
+	Params_Klout:
+	load
+	StillToScoreForKlout_user as rowKey,
+	StillToScoreForKlout_user as TwitterId,
+	if($(vUseRandomKloutScore) = '1', 'Development', 'Production') as ScriptMode
+	resident
+	StillToScoreForKlout;
+	
+	let vParamsFile = '$(vWorkingFolder)$(vQVSourceAppId)' & '_Klout.txt';
+
+	store Params_Klout into '$(vParamsFile)' (txt);
+	let vKloutRequests = NoOfRows('Params_Klout');
+	drop table Params_Klout;
+
+	if(vKloutRequests > 0) then
+	
+		Trace 'About to run $(vKloutRequests) Klout lookups in Asynchronous mode...';
+		
+		Klout:
+		LOAD
+			rowKey as Search_user_screen_name,
+			timestamp(now(1)) as KloutScore_timestamp,			
+			status as KloutScore_status,
+			score as KloutScore_score,
+			dayChange as KloutScore_dayChange,
+			weekChange as KloutScore_weekChange,
+			monthChange as KloutScore_monthChange,
+			QVSourceFromCache as KloutScore_QVSourceFromCache,
+			QVSourceCachedAt as KloutScore_QVSourceCachedAt
+		FROM
+		[http://localhost:$(vQVSourcePort)/QVSource/KloutConnectorV2/?table=UserScoreFromTwitterScreenName&processParamsAsync=$(vParamsFile)&format=qvx&appID=$(vQVSourceAppId)]
+		(qvx);
+		
+	endif
+
+	STORE Klout INTO '$(qvdKlout)';
+	
+	drop table Klout;
+
+endsub
+///$tab Sentiment
+sub getSentiment
+	
+	if vGetSentiment <> 1 then
+		exit sub;
+	endif
+
+	let qvd = 'Sentiment.qvd';
+	
+	let size = filesize('$(qvd)');
+	
+	//
+	// Start with a blank table..			    
+	Sentiment:
+	LOAD * INLINE [
+	SentimentEngine, Search_id, sentiment_entry_key, sentiment_status, sentiment_score
+	];
+	
+	if not isnull(size) then
+	
+		Sentiment:
+		LOAD
+		* 
+		FROM '$(qvd)' (qvd);
+	
+		// ****************************************************
+		// We want to construct a table just containing the 
+		// Tweets which have not yet been scored for Sentiment.
+		// ****************************************************
+		AllSentimentIds:
+		load
+		Search_id as AllSentimentIds_id,
+		sentiment_score as AllSentimentIds_id_sentiment_score
+		resident
+		Sentiment;
+		
+		outer join load
+		Search_id as AllSentimentIds_id,
+		Search_text as AllSentimentIds_text
+		resident
+		TwitterSearch;
+		
+		//
+		// This table should just contain the Tweets which have not
+		// yet been scored for Sentiment. Note that the Tweets in 
+		// here will then be scored using all the defined sentiment 
+		// engines.
+		//
+		StillToScore:
+		load
+		AllSentimentIds_id as StillToScore_Search_id,
+		AllSentimentIds_text as StillToScore_Search_text
+		resident
+		AllSentimentIds
+		where isnull(AllSentimentIds_id_sentiment_score);
+		
+		if(vDropTmpTables = '1') then
+			drop table AllSentimentIds;
+		endif
+		
+	ELSE
+	
+		StillToScore:
+		load
+		Search_id as StillToScore_Search_id,
+		Search_text as StillToScore_Search_text
+		resident
+		TwitterSearch;
+		
+	end if
+	
+	LET noRows = NoOfRows('StillToScore');
+	
+	if(noRows < 1) then
+		drop table Sentiment;
+		exit sub
+	endif
+	
+	lET nEngines = NoOfRows('SentimentEngines');
+		
+	for j=0 to $(nEngines)-1
+	
+		let engine = peek('Engine',$(j),'SentimentEngines');
+		
+		let engineToUse = engine;
+		
+		if(vUseRandomSentimentForAllEngines = '1') then
+			engineToUse = 'Random';		
+		endif
+		
+		let vProcessParam = 'Async';
+		
+		if(engineToUse = 'Sentiment140') then
+			let vProcessParam = 'Batch';			
+		endif
+				
+		Params_Sentiment:
+		load
+		StillToScore_Search_id as rowKey,
+		StillToScore_Search_text as text,
+		'$(engineToUse)' as api
+		resident
+		StillToScore;
+		
+		let vParamsFile = '$(vWorkingFolder)$(vQVSourceAppId)' & '_TextToScore.txt';
+	
+		store Params_Sentiment into '$(vParamsFile)' (txt);
+		let vSentimentLookups = NoOfRows('Params_Sentiment');
+		drop table Params_Sentiment;
+		
+		Trace 'About to run $(vSentimentLookups) sentiment lookups in asynchronous or batch mode...';
+	 
+		Sentiment:
+		LOAD
+	        '$(engine)' as SentimentEngine,
+		    rowKey as Search_id,
+ 			rowKey & '$(engine)' as sentiment_entry_key,
+		    status as sentiment_status,
+		    score as sentiment_score
+		FROM
+		[http://localhost:$(vQVSourcePort)/QVSource/TextAnalyserV2/?table=Sentiment&processParams$(vProcessParam)=$(vParamsFile)&format=qvx&appID=$(vQVSourceAppId)]
+		(qvx)
+		where status = 'OK';
+
+	next j
+	
+	STORE Sentiment INTO '$(qvd)';
+		
+	drop table Sentiment;
+
+endsub
+///$tab Keywords
+sub getKeywords
+	
+	//
+	// Note you will need an account with AlchemyAPI with the api key entered into QVSource for this to work.	
+	//
+	if(vIncludeKeywordLookup <> 1) then
+		exit sub;
+	endif
+			
+	Params_Keywords:
+	load
+	Search_id as rowKey,
+	Search_text as text,
+	'AlchemyAPI' as api
+	resident
+	TwitterSearch;
+	
+	let vParamsFile = '$(vWorkingFolder)$(vQVSourceAppId)' & '_TextToExtractKeywords.txt';
+
+	store Params_Keywords into '$(vParamsFile)' (txt);
+	let vKeywordLookups = NoOfRows('Params_Keywords');
+	drop table Params_Keywords;
+
+	Trace 'About to run $(vKeywordLookups) keywords lookups in asynchronous mode...';
+
+    SentimentForKeywords:
+	LOAD
+		rowKey as Search_id,
+		text as KeywordsWithSentiment_text,
+		relevance as KeywordsWithSentiment_relevance,
+		sentiment_type as KeywordsWithSentiment_sentiment_type,
+		sentiment_score as KeywordsWithSentiment_sentiment_score
+	FROM
+	[http://localhost:$(vQVSourcePort)/QVSource/TextAnalyserV2/?table=KeywordsWithSentiment&processParamsAsync=$(vParamsFile)&format=qvx&appID=$(vQVSourceAppId)]
+	(qvx);
+
+	STORE SentimentForKeywords INTO 'Keywords.qvd';
+
+	drop table SentimentForKeywords;
+
+endsub
+///$tab READ ME
+/*
+The idea of this app is that everything to the left <========== would create a set of QVDs in an efficient manner.
+
+You would then just include the tabs to the right =========> in a separate QlikView dashboard application which loaded the QVDs (preferably just the fields necessary.
+*/
+///$tab LoadFromQVDs
+sub loadFromQVDs
+	
+	
+	let allTweets = 'SearchResults.qvd';
+	let qvdSentiment = 'Sentiment.qvd';
+	let qvdKlout = 'Klout.qvd';
+	
+	set errormode = 1;
+	
+	Tweets:
+	LOAD distinct
+	ConvertToLocalTime(Search_created_at_timestamp, '$(vLocalTimeZone)') as Search_created_at_timestamp_local,
+	SearchTerm,
+	//rowKey & '_' & id as SearchTerm_key,
+	//timestamp(now(1)) as Search_loaded_timestamp,	    
+	Search_id,
+	//created_at as Search_created_at,
+	//timestamp#(mid(created_at, 9, 2) & '-' & mid(created_at, 5, 3) & '-' & mid(created_at, 27, 4) & ' ' & mid(created_at, 12, 8), 'DD-MMM-YYYY hh:mm:ss') as Search_created_at_timestamp,
+	//date#(mid(created_at, 9, 2) & '-' & mid(created_at, 5, 3) & '-' & mid(created_at, 27, 4), 'DD-MMM-YYYY') as Search_created_at_date,
+	//time#(mid(created_at, 12, 8), 'hh:mm:ss') as Search_created_at_time,
+	//text as Search_text,
+	//text_urlEncoded as Search_text_urlEncoded,
+	Search_lang,
+	Search_source,
+	Search_truncated,
+	Search_text,
+	Search_in_reply_to_screen_name,
+	Search_in_reply_to_status_id,
+	Search_in_reply_to_user_id,
+	//retweet_count as Search_retweet_count,
+	//favorite_count as Search_favorite_count,
+	//retweeted as Search_retweeted,
+	//favorited as Search_favorited,
+	//possibly_sensitive as Search_possibly_sensitive,
+	Search_hashtag_count,
+	Search_hash_tags,
+	Search_url_count,
+	Search_expanded_urls,
+	Search_user_mentions_count,
+	Search_user_mentions,
+	Search_media_count,
+	Search_media_expanded_urls,
+	Search_symbols_count,
+	Search_symbols,
+	Search_media_photo_count,
+	Search_media_photo_urls,
+	//metadata_result_type as Search_metadata_result_type,
+	//metadata_iso_language_code as Search_metadata_iso_language_code,
+	Search_user_id,
+	Search_user_name,
+	Search_user_screen_name,
+	Search_user_location,
+	Search_user_profile_image_url,
+	//user_description as Search_user_description,
+	//user_url as Search_user_url,
+	//user_geo_enabled as Search_user_geo_enabled,
+	//user_protected as Search_user_protected,
+	Search_user_followers_count,
+	Search_user_friends_count,
+	Search_user_listed_count,
+	//user_favourites_count as Search_user_favourites_count,
+	Search_user_statuses_count,
+	Search_user_created_at,
+	//timestamp#(mid(user_created_at, 9, 2) & '-' & mid(user_created_at, 5, 3) & '-' & mid(user_created_at, 27, 4) & ' ' & mid(user_created_at, 12, 8), 'DD-MMM-YYYY hh:mm:ss') as Search_user_user_created_at_timestamp,
+	//date#(mid(user_created_at, 9, 2) & '-' & mid(user_created_at, 5, 3) & '-' & mid(user_created_at, 27, 4), 'DD-MMM-YYYY') as Search_user_user_created_at_date,
+	//time#(mid(user_created_at, 12, 8), 'hh:mm:ss') as Search_user_user_created_at_time,
+	Search_user_utc_offset,
+	Search_user_time_zone,
+	Search_user_verified,
+	Search_user_lang,
+	//user_follow_request_sent as Search_user_follow_request_sent,
+	//user_is_translator as Search_user_is_translator,
+	//user_following as Search_user_following,
+	//user_notifications as Search_user_notifications,
+	//place_id as Search_place_id,
+	//place_url as Search_place_url,
+	//place_place_type as Search_place_place_type,
+	//place_name as Search_place_name,
+	//place_full_name as Search_place_full_name,
+	//place_country_code as Search_place_country_code,
+	//place_country as Search_place_country,
+	//place_bounding_box_type as Search_place_bounding_box_type,
+	//place_attributes as Search_place_attributes,
+	//geo_type as Search_geo_type,
+	//geo_latitude as Search_geo_latitude,
+	//geo_longitude as Search_geo_longitude,
+	//coordinates_type as Search_coordinates_type,
+	//coordinates_latitude as Search_coordinates_latitude,
+	//coordinates_longitude as Search_coordinates_longitude,
+	Search_retweeted_status_id
+	//retweeted_status_created_at as Search_retweeted_status_created_at,
+	//timestamp#(mid(retweeted_status_created_at, 9, 2) & '-' & mid(retweeted_status_created_at, 5, 3) & '-' & mid(retweeted_status_created_at, 27, 4) & ' ' & mid(retweeted_status_created_at, 12, 8), 'DD-MMM-YYYY hh:mm:ss') as Search_retweeted_status_retweeted_status_created_at_timestamp,
+	//date#(mid(retweeted_status_created_at, 9, 2) & '-' & mid(retweeted_status_created_at, 5, 3) & '-' & mid(retweeted_status_created_at, 27, 4), 'DD-MMM-YYYY') as Search_retweeted_status_retweeted_status_created_at_date,
+	//time#(mid(retweeted_status_created_at, 12, 8), 'hh:mm:ss') as Search_retweeted_status_retweeted_status_created_at_time,
+	//retweeted_status_text as Search_retweeted_status_text,
+	//retweeted_status_text_urlEncoded as Search_retweeted_status_text_urlEncoded,
+	//retweeted_status_lang as Search_retweeted_status_lang,
+	//retweeted_status_source as Search_retweeted_status_source,
+	//retweeted_status_truncated as Search_retweeted_status_truncated,
+	//retweeted_status_in_reply_to_screen_name as Search_retweeted_status_in_reply_to_screen_name,
+	//retweeted_status_in_reply_to_status_id as Search_retweeted_status_in_reply_to_status_id,
+	//retweeted_status_in_reply_to_user_id as Search_retweeted_status_in_reply_to_user_id,
+	//retweeted_status_retweet_count as Search_retweeted_status_retweet_count,
+	//retweeted_status_favorite_count as Search_retweeted_status_favorite_count,
+	//retweeted_status_retweeted as Search_retweeted_status_retweeted,
+	//retweeted_status_favorited as Search_retweeted_status_favorited,
+	//retweeted_status_possibly_sensitive as Search_retweeted_status_possibly_sensitive,
+	//retweeted_status_hashtag_count as Search_retweeted_status_hashtag_count,
+	//retweeted_status_hash_tags as Search_retweeted_status_hash_tags,
+	//retweeted_status_url_count as Search_retweeted_status_url_count,
+	//retweeted_status_expanded_urls as Search_retweeted_status_expanded_urls,
+	//retweeted_status_user_mentions_count as Search_retweeted_status_user_mentions_count,
+	//retweeted_status_user_mentions as Search_retweeted_status_user_mentions,
+	//retweeted_status_media_count as Search_retweeted_status_media_count,
+	//retweeted_status_media_expanded_urls as Search_retweeted_status_media_expanded_urls,
+	//retweeted_status_symbols_count as Search_retweeted_status_symbols_count,
+	//retweeted_status_symbols as Search_retweeted_status_symbols,
+	//retweeted_status_media_photo_count as Search_retweeted_status_media_photo_count,
+	//retweeted_status_media_photo_urls as Search_retweeted_status_media_photo_urls,
+	//retweeted_status_metadata_result_type as Search_retweeted_status_metadata_result_type,
+	//retweeted_status_metadata_iso_language_code as Search_retweeted_status_metadata_iso_language_code,
+	//retweeted_status_user_id as Search_retweeted_status_user_id,
+	//retweeted_status_user_name as Search_retweeted_status_user_name,
+	//retweeted_status_user_screen_name as Search_retweeted_status_user_screen_name,
+	//retweeted_status_user_location as Search_retweeted_status_user_location,
+	//retweeted_status_user_profile_image_url as Search_retweeted_status_user_profile_image_url,
+	//retweeted_status_user_description as Search_retweeted_status_user_description,
+	//retweeted_status_user_url as Search_retweeted_status_user_url,
+	//retweeted_status_user_geo_enabled as Search_retweeted_status_user_geo_enabled,
+	//retweeted_status_user_protected as Search_retweeted_status_user_protected,
+	//retweeted_status_user_followers_count as Search_retweeted_status_user_followers_count,
+	//retweeted_status_user_friends_count as Search_retweeted_status_user_friends_count,
+	//retweeted_status_user_listed_count as Search_retweeted_status_user_listed_count,
+	//retweeted_status_user_favourites_count as Search_retweeted_status_user_favourites_count,
+	//retweeted_status_user_statuses_count as Search_retweeted_status_user_statuses_count,
+	//retweeted_status_user_created_at as Search_retweeted_status_user_created_at,
+	//timestamp#(mid(retweeted_status_user_created_at, 9, 2) & '-' & mid(retweeted_status_user_created_at, 5, 3) & '-' & mid(retweeted_status_user_created_at, 27, 4) & ' ' & mid(retweeted_status_user_created_at, 12, 8), 'DD-MMM-YYYY hh:mm:ss') as Search_retweeted_status_user_retweeted_status_user_created_at_timestamp,
+	//date#(mid(retweeted_status_user_created_at, 9, 2) & '-' & mid(retweeted_status_user_created_at, 5, 3) & '-' & mid(retweeted_status_user_created_at, 27, 4), 'DD-MMM-YYYY') as Search_retweeted_status_user_retweeted_status_user_created_at_date,
+	//time#(mid(retweeted_status_user_created_at, 12, 8), 'hh:mm:ss') as Search_retweeted_status_user_retweeted_status_user_created_at_time,
+	//retweeted_status_user_utc_offset as Search_retweeted_status_user_utc_offset,
+	//retweeted_status_user_time_zone as Search_retweeted_status_user_time_zone,
+	//retweeted_status_user_verified as Search_retweeted_status_user_verified,
+	//retweeted_status_user_lang as Search_retweeted_status_user_lang,
+	//retweeted_status_user_follow_request_sent as Search_retweeted_status_user_follow_request_sent,
+	//retweeted_status_user_is_translator as Search_retweeted_status_user_is_translator,
+	//retweeted_status_user_following as Search_retweeted_status_user_following,
+	//retweeted_status_user_notifications as Search_retweeted_status_user_notifications,
+	//retweeted_status_place_id as Search_retweeted_status_place_id,
+	//retweeted_status_place_url as Search_retweeted_status_place_url,
+	//retweeted_status_place_place_type as Search_retweeted_status_place_place_type,
+	//retweeted_status_place_name as Search_retweeted_status_place_name,
+	//retweeted_status_place_full_name as Search_retweeted_status_place_full_name,
+	//retweeted_status_place_country_code as Search_retweeted_status_place_country_code,
+	//retweeted_status_place_country as Search_retweeted_status_place_country,
+	//retweeted_status_place_bounding_box_type as Search_retweeted_status_place_bounding_box_type,
+	//retweeted_status_place_attributes as Search_retweeted_status_place_attributes,
+	//retweeted_status_geo_type as Search_retweeted_status_geo_type,
+	//retweeted_status_geo_latitude as Search_retweeted_status_geo_latitude,
+	//retweeted_status_geo_longitude as Search_retweeted_status_geo_longitude,
+	//retweeted_status_coordinates_type as Search_retweeted_status_coordinates_type,
+	//retweeted_status_coordinates_latitude as Search_retweeted_status_coordinates_latitude,
+	//retweeted_status_coordinates_longitude as Search_retweeted_status_coordinates_longitude		
+	
+	FROM '$(allTweets)' (qvd);
+	
+	Tweets_with_local:
+	LOAD
+	*,
+	
+	if(Search_in_reply_to_status_id <> '', 'Reply', if(Search_retweeted_status_id <> '', 'Retweet', 'Tweet')) as Search_TweetType,
+	if(Search_retweeted_status_id <> '', 'true', 'false') as Search_IsRetweet,
+	if(Search_in_reply_to_status_id <> '', 'true', 'false') as Search_IsReply,
+	makedate(year(Search_created_at_timestamp_local), month(Search_created_at_timestamp_local), day(Search_created_at_timestamp_local)) as Search_created_at_date_local
+	resident
+	Tweets;
+	
+	drop table Tweets;
+	rename table Tweets_with_local to Tweets;
+	
+	//exit script;
+	
+	HashTags:
+	LOAD Distinct
+		Search_id,
+	   	// trim(subfield(Search_hash_tags, ',')) as HashTag, having 2 trip lines in caused errors in the table.
+	   	'#' & lower(trim(subfield(Search_hash_tags, ','))) as HashTagLowerCase
+	Resident Tweets
+	where Search_hashtag_count > 0;
+	
+	Symbols:
+	LOAD Distinct
+		Search_id,
+	   	// trim(subfield(Search_hash_tags, ',')) as HashTag, having 2 trip lines in caused errors in the table.
+	   	'#' & lower(trim(subfield(Search_symbols, ','))) as SymbolsLowerCase
+	Resident Tweets
+	where Search_symbols_count > 0;
+	
+	
+	UserMentions:
+	LOAD Distinct
+		Search_id,
+	   	trim(subfield(Search_user_mentions, ',')) as UserMention
+	Resident Tweets
+	where Search_user_mentions_count > 0;
+	
+	Urls:
+	LOAD Distinct
+		Search_id,
+	   	trim(subfield(Search_expanded_urls, ',')) as Url
+	Resident Tweets
+	where Search_url_count > 0;
+	
+	MediaLinks:
+	LOAD Distinct
+		Search_id,
+	   	trim(subfield(Search_media_expanded_urls, ',')) as MediaUrl
+	Resident Tweets
+	where Search_media_count > 0;
+	
+	PhotoLinks:
+	LOAD Distinct
+		Search_id,
+	   	trim(subfield(Search_media_photo_urls, ',')) as PhotoUrl
+	Resident Tweets
+	where Search_media_photo_count > 0;
+	
+	
+	/*
+	CalculatedTweetCount:
+	LOAD
+	Search_from_user_id,
+	count(Search_id) as TotalTweets
+	resident
+	Tweets
+	group by Search_from_user_id;
+	*/
+	
+	
+	//drop table TwitterSearch;
+	
+	if vGetSentiment = 1 then
+	
+		Sentiment:
+		LOAD
+		Search_id,
+		SentimentEngine,
+		sentiment_status,
+		sentiment_score,
+		if(sentiment_score = 0, 'neutral', if(sentiment_score > 0, 'positive', 'negative')) as sentiment_mood
+		FROM '$(qvdSentiment)' (qvd);
+		
+	endif
+	
+	//drop Field sentiment_entry_key;
+	
+	if vGetKloutScores = 1 then
+		Klout:
+		LOAD
+		Search_user_screen_name,
+		KloutScore_score
+		FROM '$(qvdKlout)' (qvd);
+	endif
+	
+	TrackedTwitterAccounts_Klout:
+	load
+	*,
+	makedate(year(TrackedTwitterAccounts_Klout_timestamp), month(TrackedTwitterAccounts_Klout_timestamp), day(TrackedTwitterAccounts_Klout_timestamp)) as TrackedTwitterAccounts_Klout_date
+	from 'TrackedTwitterAccounts_Klout.qvd' (qvd);
+	
+	TrackedTwitterAccounts:
+	LOAD
+	*
+	//TwitterAccount,
+	//TrackedTwitterAccounts_timestamp,
+	//makedate(year(TrackedTwitterAccounts_timestamp), month(TrackedTwitterAccounts_timestamp), day(TrackedTwitterAccounts_timestamp)) as TrackedTwitterAccounts_date,
+	//TrackedTwitterAccounts_id,
+	//TrackedTwitterAccounts_name,
+	//TrackedTwitterAccounts_screen_name,
+	//TrackedTwitterAccounts_location,
+	//TrackedTwitterAccounts_description,
+	//TrackedTwitterAccounts_followers_count,
+	//TrackedTwitterAccounts_friends_count,
+	//TrackedTwitterAccounts_favourites_count,
+	//TrackedTwitterAccounts_statuses_count,
+	//TrackedTwitterAccounts_listed_count,
+	//TrackedTwitterAccounts_profile_image_url,
+	//TrackedTwitterAccounts_profile_image_url_https,
+	//TrackedTwitterAccounts_url,
+	//TrackedTwitterAccounts_protected,
+	//TrackedTwitterAccounts_time_zone,
+	//TrackedTwitterAccounts_notifications,
+	//TrackedTwitterAccounts_geo_enabled,
+	//TrackedTwitterAccounts_lang,
+	//TrackedTwitterAccounts_verified
+	FROM 'TrackedTwitterAccounts.qvd' (qvd);
+	
+	left join (TrackedTwitterAccounts)
+	load
+		Grouping,
+		lower(TwitterAccount) as TrackedTwitterAccounts_user_screen_name_LOWERED
+	resident
+	TwitterAccountsToTrack;
+	
+	drop table TwitterAccountsToTrack;
+		
+	if(vIncludeKeywordLookup = 1) then
+		SentimentForKeywords:
+		load * from 'Keywords.qvd' (qvd);
+	endif
+	
+	TwitterSearchTerms:
+	load * from 'TwitterSearchTerms.qvd' (qvd);
+	
+	TwitterAccountsToTrack:
+	load * from 'TwitterAccountsToTrack.qvd' (qvd);
+	
+	
+	// FOR OPTIMAL PERFORMANCE AND APP SIZE DROP ALL FIELDS NOT USED IN YOUR FRONT END.
+	/*
+	drop Field Search_entities_hashtags_indices;
+	drop Field Search_entities_user_mentions_screen_name;
+	drop Field Search_entities_user_mentions_name;
+	drop Field Search_entities_user_mentions_id;
+	drop Field Search_entities_user_mentions_id_str;
+	drop Field Search_entities_user_mentions_indices;
+	drop Field Search_entities;
+	//drop Field Search_from_user_id;
+	drop Field Search_from_user_id_str;
+	drop Field Search_from_user_name;
+	drop Field Search_geo;
+	drop Field Search_id_str;
+	drop Field Search_iso_language_code;
+	drop Field Search_metadata_result_type;
+	drop Field Search_profile_image_url_https;
+	drop Field Search_source;
+	drop Field Search_to_user;
+	drop Field Search_to_user_id;
+	drop Field Search_to_user_id_str;
+	drop Field Search_to_user_name;
+	drop Field Search_entities_urls_url;
+	drop Field Search_entities_urls_expanded_url;
+	drop Field Search_entities_urls_display_url;
+	drop Field Search_entities_urls_indices;
+	drop Field Search_geo_latitude;
+	drop Field Search_geo_longitude;
+	drop Field Search_entity_hashs;
+	drop Field Search_entity_mentions;
+	drop Field Search_entity_links;
+	drop Field Search_entity_source;
+	drop Field Search_geo_type;
+	drop Field Search_place_full_name;
+	drop Field Search_place_id;
+	drop Field Search_place_type;
+	
+	drop Field KloutScore_fromcache;
+	
+	drop Table SentimentEngines;
+	*/
+endsub
+///$tab Main
+//
+// To just load QVDs comment out everything except for call to loadFromQVDs;
+//
+
+call CheckQVSourceStatus;
+call getTrackedTwitterAccountsInfo;
+call getSearchResults;
+call getKloutScores;
+call getSentiment;
+call getKeywords;
+
+if(vDropTmpTables = '1') then
+
+	call dropTableIfExists('tmpAllHashTags');	
+	call dropTableIfExists('tmpStillToGetHashTagsFor');	
+	call dropTableIfExists('tmpAllMentions');	
+	call dropTableIfExists('tmpStillToGetMentionsFor');	
+	call dropTableIfExists('tmpAllMedia');	
+	call dropTableIfExists('tmpStillToGetMediaFor');	
+	call dropTableIfExists('tmpAllUrls');	
+	call dropTableIfExists('tmpStillToGetUrlsFor');	
+	call dropTableIfExists('SentimentEngines');	
+	call dropTableIfExists('StillToScore');	
+	call dropTableIfExists('StillToScoreForKlout');	
+	
+endif
+
+drop Table TwitterSearch;
+
+call sendErrorSummary;
+
+call loadFromQVDs;

@@ -1,0 +1,205 @@
+﻿// --------------------------------------------------------------------------------------------------------
+// THE FOLLOWING SHOULD BE REVIEWED BEFORE RELOADING THIS APPLICATION
+// --------------------------------------------------------------------------------------------------------
+
+//
+// Enter something like: GMT, GMT-01:00, GMT+04:00 etc. here.
+//
+// If this does not work try something like: UTC, UTC+01:00 etc.
+//
+let vLocalTimeZone = 'UTC+01:00';
+let vLocalReloadTime = date(ConvertToLocalTime(gmt(), '$(vLocalTimeZone)'), 'DD/MM/YYYY hh:mm');
+
+// If you only want Tweets in a certain language specify the two 
+// letter code here - e.g. 'en'.
+// Leave blank for everything.
+// You should first test you have the correct language code 
+// using the QVSource UI.
+//
+let vLang = '';
+
+//
+// An identifier for the app - used for error logging. Should be 
+// unique across all QVSource documents reloading on a given machine.
+//
+let vQVSourceAppId = 'Twitter_Demo'; 	// Used for example in error emails and logging.
+
+//
+// A folder which QlikView has write access to and QVSource has read access 
+// to. See http://www.qvsource.com/wiki/Synchronous-Asynchronous-And-Batch-Requests-Explained.ashx 
+// for more info.
+//
+let vWorkingFolder = 'c:\QVSource\Temp\';
+
+let vTitle = 'Twitter Tracker Demo';
+
+//
+// If you simply want to collect Tweets you can turn off sentiment analysis 
+// and Klout score lookups.
+//
+let vGetSentiment = 1;
+let vGetKloutScores = 1;
+
+//
+// Useful during development work to speed up load times. If you want to change this to 1 you should 
+// also delete any sentiment QVD files so that they will be re-generated with real data.
+//
+let vUseRandomSentimentForAllEngines = 0;
+
+//
+// Useful during development work to speed up load times. If you want to change this to 1 you should 
+// delete the Klout.qvd file so that it will be re-generated with real data.
+//
+
+// NOTE: This applies only to the large number of users associated with the searched for Tweets.
+// The Klout score for the users in the TwitterAccounts table is currently 'hard coded' to be looked up.
+//
+let vUseRandomKloutScore = 1;		
+
+//
+// IMPORTANT: This uses AlchemyAPI so only turn this on if you have entered an API key into QVSource 
+// with sufficient quota to score all the data you are likely to load.
+//
+let vIncludeKeywordLookup = 0;
+
+// -------------------------------------------------------------------------------
+// SEARCH TERMS TO FIND TWEETS WITH
+// -------------------------------------------------------------------------------
+//
+// Edit the following table so that the right column contains the 
+// Twitter search term and the left column contains a friendly name (which
+// matches the TwitterAccounts table below) to be used in charts.
+//
+// NOTE that you can use any of the standard search operators here, as listed
+// at http://twitter.com/#!/search-home (click the 'operators' link) and listed
+// below.
+//
+// Operator				Finds tweets...
+// twitter search			containing both "twitter" and "search". This is the default operator.
+// """happy hour"""				containing the exact phrase "happy hour". (note we use """ to denote " in this config table for QlikView)
+// love OR hate				containing either "love" or "hate" (or both).
+// beer -root				containing "beer" but not "root".
+// #haiku				containing the hashtag "haiku".
+// from:alexiskold			sent from person "alexiskold".
+// to:techcrunch			sent to person "techcrunch".
+// @mashable				referencing person "mashable".
+// "happy hour"	near:"san francisco"	containing the exact phrase "happy hour" and sent near "san francisco".
+// near:NYC	within:15mi		sent within 15 miles of "NYC".
+// superhero since:2010-12-27		containing "superhero" and sent since date "2010-12-27" (year-month-day).
+// ftw until:2010-12-27			containing "ftw" and sent up to date "2010-12-27".
+// movie -scary :)			containing "movie", but not "scary", and with a positive attitude.
+// flight :(				containing "flight" and with a negative attitude.
+// traffic ?				containing "traffic" and asking a question.
+// hilarious filter:links		containing "hilarious" and linking to URLs.
+// news source:twitterfeed		containing "news" and entered via TwitterFeed
+//
+// PLEASE NOTE: The Twitter search API allows up to 180 requests per 15 minute window and each search can return 
+// up to 1500 Tweets (i.e. 15 API calls each returning 100 Tweets).
+//
+// Further, by default this application runs each of the following search terms with "SEARCH_TERM RT" and 
+// "SEARCH_TERM -RT" to extract Tweets and Retweets separately.
+//
+// Therefore if you have 6 search terms this would translate to 12 initial searches each of which could in theory 
+// each return 1500 results using 15 API calls = 15x12 = 180 API calls which is the limit.
+//
+// The application could be adjusted in various ways, for example the search could be made on the exact search terms 
+// below (i.e. without ... RT and ... -RT) and each search could be configured to only use one API call (e.g. set the 
+// number of pages of results to 1. This would mean in theory you could run 180 search terms per 15 minute window, each 
+// returning a max of 100 results.
+//
+// Multiple search terms could also be combined into a single search request.
+//
+// Usually when a small number of search terms are used the above does not need to be considered.
+//
+TwitterSearchTerms:
+LOAD * INLINE [
+Grouping, SearchTerm
+SAP, """business objects""",
+SAP, #sap,
+SAP, from:SAPAnalytics,QlikView, qlikview,
+QlikView, from:QlikView,
+MicroStrategy, microstrategy,
+MicroStrategy, from:microstrategy,
+];
+
+/*
+Spotfire, from:TibcoSpotfire,
+Cognos, from:IBMCognosCTO,
+LogiXML, from:LogiXML,
+PowerPivot, from:powerpivot,
+Tableau, from:tableau,
+Spotfire, #TibcoSpotfire
+Spotfire, #SpotfireSupport
+Cognos, #IBMCognos
+LogiXML, #LogiXML
+PowerPivot, #powerpivot
+Tableau, #tableau
+*/
+
+// -------------------------------------------------------------------------------
+// TWITTER ACCOUNTS TO TRACK IN MORE DETAIL
+// -------------------------------------------------------------------------------
+//
+//Edit the following table so that the right column contains the 
+//Twitter accounts and the left column contains a friendly name
+//to be used in charts.
+//
+// NOTE: Do not include @ prefix.
+//
+TwitterAccountsToTrack:
+LOAD * INLINE [
+Grouping, TwitterAccount
+QlikView, QlikView
+Business Objects, BusinessObjects
+SAP, SAPAnalytics
+MicroStrategy, microstrategy
+];
+
+/*
+Additional example accounts which could be added into the above
+SAP, SAP,
+Spotfire, TibcoSpotfire,
+Cognos, IBMCognosCTO,
+LogiXML, LogiXML,
+PowerPivot, powerpivot,
+Tableau, tableau,
+*/
+
+//
+// Configure this table with one or more of the following sentiment APIs:
+//
+// Repustate
+// Sentiment140
+// AlchemyAPI
+// Random
+//
+// NOTE:
+// - You may need to ensure you have API keys configured in QVSource for the selections you make here with 
+// enough quota to be able to score all the content.
+// - The QVSource Sentiment Analysis & Text Analytics Connector also connects to other APIs which you can 
+// of course also use however you would need to modify the load script accordingly.
+//
+SentimentEngines:
+LOAD * INLINE [
+Engine
+Sentiment140
+];
+
+// --------------------------------------------------------------------------------------------------------
+// THE FOLLOWING ARE INTENDED FOR ADVANCED USE ONLY
+// --------------------------------------------------------------------------------------------------------
+let vEmailNotificationAddress = '';	// Email address to send load errors to. Ensure you have configured the Notifier Connector for this to work.
+let vQVSourcePort = '5555';			// If for some reason you have to run QVSource on a non standard port.
+let vDropTmpTables = 1;			// Recommended unless debugging issues.
+let vMaxTwitterSearchPages = 15;	// This would normally be set to the maximum (15) unless you would like to debug your scripts with less data.
+
+//
+// QVSource can now run certain loads asynchronously (i.e. multiple requests on parallel threads) 
+// which can give large performance boosts.
+//
+// Turn this on to take advantage of this.
+// See the following page for more information:
+// http://www.qvsource.com/wiki/Asynchonous-Mode.ashx
+//
+let vUseAsyncWherePossible = 1;
+let vAsyncSentiment = vUseAsyncWherePossible; // should be 0 or 1.

@@ -1,0 +1,432 @@
+﻿///$tab Notes
+/*
+v1.1.1 01-03-13
+---------------
+- Updated for data model 1.0.6
+
+v1.1 09-11-12
+-------------
+****Works with "QVSource Twitter Demo - Load Script & Data Model 1.0.5" - the load script and data model application needs to be run first in order to create the qvds that this (Sample Charts & KPIs) application uses and builds upon****
+- Given a new look and feel so that its easier to use with ipads and low resolution displays.
+*/
+///$tab Settings
+let allTweets = 'SearchResults.qvd';
+let qvdSentiment = 'Sentiment.qvd';
+let qvdKlout = 'Klout.qvd';
+let newJoinersDate = date(today()-5);
+
+// Search Intervals
+TotalTweetsIntervals_Search:
+Load * Inline [
+TotalTweetsStart_Search, TotalTweetsEnd_Search, TotalTweetsDisplay_Search
+0					   , 3					  , '< 4'
+4					   , 8				      , '4 - 8'
+9					   , 12			          , '9 - 12'
+13					   , 999999999		      , '> 12'
+];
+
+// Klout Intervals
+KloutIntervals:
+Load * Inline [
+KloutStart, KloutEnd, KloutDisplay
+0		  , 10		, '0-10'
+10.01	  , 20		, '10-20'
+20.01	  , 30		, '20-30'
+30.01     , 40		, '30-40'
+40.01	  , 50		, '40-50'
+50.01	  , 60		, '50-60'
+60.01	  , 70		, '60-70'
+70.01	  , 80		, '70-80'
+80.01	  , 90		, '80-90'
+90.01	  , 100		, '90-100'
+];
+
+// Now Intervals - Tweet by date of last Tweet 
+NowInervals:
+Load * Inline [
+NowInervalStart, NowInervalEnd, NowInervalDisplay
+0			   , 60			  , 'Last Minute'
+61			   , 300		  , 'Last 5 Minutes'
+301			   , 3600		  , 'Last Hour'
+3601		   , 18000        , 'Last 6 Hours'
+18001		   , 86400        , 'Last 24 Hours'
+86401		   , 604800       , 'Last Week'
+604801		   , 2419200      , 'Last Month'
+2419201		   , 999999999999 , '> 1 Month'
+];
+
+// Tracked Accounts Intervals
+TotalTweetsIntervals:
+Load * Inline [
+TotalTweetsStart, TotalTweetsEnd, TotalTweetsDisplay
+0				, 1000			, '< 1000'
+1001			, 5000			, '1000 - 5000'
+5001			, 10000			, '5000 - 10000'
+10001			, 999999999		, '> 10000'
+];
+
+// Followers Intervals
+FollowersIntervals:
+Load * Inline [
+FollowersIntervalStart, FollowersIntervalEnd, FollowersIntervalDisplay
+0				      , 1000			    , '< 1000'
+1001			      , 5000			    , '1000 - 5000'
+5001			      , 10000			    , '5000 - 10000'
+10001			      , 999999999	  	    , '> 10000'
+];
+
+// Friends Intervals
+FriendsIntervals:
+Load * Inline [
+FriendsIntervalStart, FriendsIntervalEnd, FriendsIntervalDisplay
+0				    , 1000			    , '< 1000'
+1001			    , 5000			    , '1000 - 5000'
+5001			    , 10000			    , '5000 - 10000'
+10001			    , 999999999	  	    , '> 10000'
+];
+///$tab Data
+let allTweets = 'SearchResults.qvd';
+let qvdSentiment = 'Sentiment.qvd';
+let qvdKlout = 'Klout.qvd';
+
+Tweets:
+LOAD distinct
+ConvertToLocalTime(Search_created_at_timestamp, '$(vLocalTimeZone)') as Search_created_at_timestamp_local,
+*
+FROM '$(allTweets)' (qvd);
+
+Tweets_with_local:
+LOAD
+*,
+makedate(year(Search_created_at_timestamp_local), month(Search_created_at_timestamp_local), day(Search_created_at_timestamp_local)) as Search_created_at_date_local
+resident
+Tweets;
+
+drop table Tweets;
+rename table Tweets_with_local to Tweets;
+
+HashTags:
+LOAD Distinct
+	Search_id,
+   	// trim(subfield(Search_hash_tags, ',')) as HashTag, having 2 trip lines in caused errors in the table.
+   	'#' & lower(trim(subfield(Search_hash_tags, ','))) as HashTagLowerCase
+Resident Tweets
+where Search_hashtag_count > 0;
+
+UserMentions:
+LOAD Distinct
+	Search_id,
+   	trim(subfield(Search_user_mentions, ',')) as UserMention
+Resident Tweets
+where Search_user_mentions_count > 0;
+
+Urls:
+LOAD Distinct
+	Search_id,
+   	trim(subfield(Search_expanded_urls, ',')) as Url
+Resident Tweets
+where Search_url_count > 0;
+
+MediaLinks:
+LOAD Distinct
+	Search_id,
+   	trim(subfield(Search_media_expanded_urls, ',')) as MediaUrl
+Resident Tweets
+where Search_media_count > 0;
+
+PhotoLinks:
+LOAD Distinct
+	Search_id,
+   	trim(subfield(Search_media_photo_urls, ',')) as PhotoUrl
+Resident Tweets
+where Search_media_photo_count > 0;
+
+CalculatedTweetCount:
+LOAD
+Search_user_id,
+count(Search_id) as TotalTweets
+resident
+Tweets
+group by Search_user_id;
+
+//drop table TwitterSearch;
+
+left join 
+
+	IntervalMatch ( TotalTweets ) 
+	Load 
+		TotalTweetsStart_Search, 
+		TotalTweetsEnd_Search 
+	Resident TotalTweetsIntervals_Search;
+	
+join 
+	Load
+		TotalTweetsStart_Search, 
+		TotalTweetsEnd_Search, 
+		TotalTweetsDisplay_Search
+	Resident TotalTweetsIntervals_Search;
+
+Drop Table TotalTweetsIntervals_Search;
+
+
+Sentiment:
+LOAD
+Search_id,
+SentimentEngine,
+sentiment_status,
+sentiment_score,
+if(sentiment_score = 0, 'neutral', if(sentiment_score > 0, 'positive', 'negative')) as sentiment_mood
+FROM '$(qvdSentiment)' (qvd);
+
+Klout:
+LOAD
+Search_user_screen_name,
+KloutScore_score
+FROM '$(qvdKlout)' (qvd);
+
+left join 
+
+	IntervalMatch ( KloutScore_score ) 
+	Load 
+		KloutStart, 
+		KloutEnd 
+	Resident KloutIntervals;
+	
+join 
+	Load
+		KloutStart, 
+		KloutEnd, 
+		KloutDisplay
+	Resident KloutIntervals;
+
+
+TrackedTwitterAccounts:
+LOAD
+*
+FROM 'TrackedTwitterAccounts.qvd' (qvd);
+
+// Statuses Interval
+left join 
+
+	IntervalMatch ( TrackedTwitterAccounts_user_statuses_count ) 
+	Load 
+		TotalTweetsStart, 
+		TotalTweetsEnd 
+	Resident TotalTweetsIntervals;
+	
+join 
+	Load
+		TotalTweetsStart, 
+		TotalTweetsEnd, 
+		TotalTweetsDisplay
+	Resident TotalTweetsIntervals;
+
+// Followers Interval	
+left join 
+
+	IntervalMatch ( TrackedTwitterAccounts_user_followers_count ) 
+	Load 
+		FollowersIntervalStart,
+		FollowersIntervalEnd
+	Resident FollowersIntervals;
+	
+join 
+	Load
+		FollowersIntervalStart, 
+		FollowersIntervalEnd,
+		FollowersIntervalDisplay
+	Resident FollowersIntervals;	
+	
+// Friends Interval	
+left join 
+
+	IntervalMatch ( TrackedTwitterAccounts_user_friends_count ) 
+	Load 
+		FriendsIntervalStart,
+		FriendsIntervalEnd
+	Resident FriendsIntervals;
+	
+join 
+	Load
+		FriendsIntervalStart, 
+		FriendsIntervalEnd,
+		FriendsIntervalDisplay
+	Resident FriendsIntervals;		
+	
+	
+
+Drop Table TotalTweetsIntervals;	
+Drop Table FollowersIntervals;
+Drop Table FriendsIntervals;
+
+
+TrackedTwitterAccounts_Klout:
+load
+*,
+makedate(year(TrackedTwitterAccounts_Klout_timestamp), month(TrackedTwitterAccounts_Klout_timestamp), day(TrackedTwitterAccounts_Klout_timestamp)) as TrackedTwitterAccounts_Klout_date
+from 'TrackedTwitterAccounts_Klout.qvd' (qvd);
+
+left join 
+
+	IntervalMatch ( TrackedTwitterAccounts_Klout_score ) 
+	Load 
+		KloutStart	as TrackedAccount_KloutStart, 
+		KloutEnd 	as TrackedAccount_KloutEnd
+	Resident KloutIntervals;
+	
+join 
+	Load
+		KloutStart	    as TrackedAccount_KloutStart, 
+		KloutEnd	    as TrackedAccount_KloutEnd, 
+		KloutDisplay	as TrackedAccount_KloutDisplay
+	Resident KloutIntervals;
+	
+Drop Table KloutIntervals;
+
+TwitterSearchTerms:
+load * from 'TwitterSearchTerms.qvd' (qvd);
+
+TwitterAccountsToTrack:
+load * from 'TwitterAccountsToTrack.qvd' (qvd);
+///$tab Response Time Initial Records
+ResponseTime_Temp:
+Load
+	Search_in_reply_to_status_id,
+	Search_created_at_timestamp_local,
+	if(Search_in_reply_to_status_id <> peek('Search_in_reply_to_status_id'),1,0) as Test
+	
+;
+Load
+	Search_in_reply_to_status_id,
+	Search_created_at_timestamp_local
+Resident Tweets
+Order By 
+	Search_in_reply_to_status_id,
+	Search_created_at_timestamp_local
+;
+
+join (Tweets)
+
+Load
+	Search_in_reply_to_status_id,
+	Search_created_at_timestamp_local	as ResponseTime_FistTime
+Resident ResponseTime_Temp
+Where Test = 1
+;
+
+Drop Table ResponseTime_Temp;
+
+Rename Table Tweets To Tweets_old;
+
+Tweets:
+Load 
+	*,
+	makedate(year(Search_created_at_timestamp_local), month(Search_created_at_timestamp_local), day(Search_created_at_timestamp_local)) & '_' & SearchTerm		as Tweet_NewJoin_Key,
+//	MakeDate(year(Search_created_at_timestamp_local), month(Search_created_at_timestamp_local), day(Search_created_at_timestamp_local)) as Search_created_at_date_local//,
+	(Search_created_at_timestamp_local - ResponseTime_FistTime) 																		as ResponseTime,
+	Interval(Search_created_at_timestamp_local - ResponseTime_FistTime,'dd hh:mm:ss') 													as ResponseTimeSec,
+	replace(Right(Search_source, len(Search_source)- index(Search_source,'>',-2)),'</a>','')											as Search_TweetChannel,
+	date(Search_created_at_timestamp_local) & ' ' & 
+		if(hour(Search_created_at_timestamp_local) < 10, 
+			0&''&hour(Search_created_at_timestamp_local), 
+			hour(Search_created_at_timestamp_local)
+		   ) 																															as Search_created_at_date_hour_local,
+	date(Search_created_at_timestamp_local) & ' ' & 
+		hour(Search_created_at_timestamp_local) 
+			& ':' & minute(Search_created_at_timestamp_local) 																			as Search_created_at_date_hour_min_local,
+	num(left(interval(now() - Search_created_at_timestamp,'s'),10))																		as NowInterval,
+	left(Date(Search_created_at_timestamp_local),10)																					as CalendarDate
+Resident Tweets_old;
+
+left join 
+
+	IntervalMatch ( NowInterval ) 
+	Load 
+		NowInervalStart, 
+		NowInervalEnd 
+	Resident NowInervals;
+	
+join 
+	Load
+		NowInervalStart, 
+		NowInervalEnd, 
+		NowInervalDisplay
+	Resident NowInervals;
+
+Drop Table NowInervals;
+
+Drop Table Tweets_old;
+///$tab New Joiners
+Let SearchTermsCount = FieldValueCount('SearchTerm');
+
+for i = 1 to $(SearchTermsCount)
+
+	Let SearchTerm = FieldValue('SearchTerm',$(i));
+
+	NewJoiners_Temp:
+	Load
+		distinct 
+		Search_user_screen_name	as Test_User
+	Resident Tweets
+	where 
+			1 = 1 
+		and Search_created_at_date_local <= '$(newJoinersDate)'
+		and SearchTerm = '$(SearchTerm)'
+	;
+	
+	
+	NewJoiners:
+	Load
+		distinct 
+		date(Search_created_at_date_local) & '_' & '$(SearchTerm)'		as Tweet_NewJoin_Key,
+		Search_user_screen_name				as NewJoin_User,
+		1								as NewJoin
+		//'$(SearchTerm)'					as SearchTerm
+	Resident Tweets
+	where 
+			1 = 1 
+		and Search_created_at_date_local > '$(newJoinersDate)'
+		and SearchTerm = '$(SearchTerm)'
+		and not Exists (Test_User, Search_user_screen_name)
+	;
+	
+	Concatenate
+	
+	Load
+		distinct 
+		date(Search_created_at_date_local) & '_' & '$(SearchTerm)'		as Tweet_NewJoin_Key,
+		1								as NewJoin
+//		'$(SearchTerm)'					as SearchTerm
+	Resident Tweets
+	where 
+			1 = 1 
+		and Search_created_at_date_local <= '$(newJoinersDate)'
+		and SearchTerm = '#teamjessie'
+	;
+	
+	Drop Table NewJoiners_Temp;
+next
+	
+
+///$tab Calendar
+CalendarTemp:
+Load
+	Max(CalendarDate) AS DateMax,
+	Min(CalendarDate) AS DateMin
+Resident Tweets;
+
+LET vMaxDate = FieldValue('DateMax', 1);
+LET vMinDate = FieldValue('DateMin', 1) -1;
+
+Drop Table CalendarTemp;
+
+MasterCalendar:
+Load 
+	Date(IterNo() + Date($(vMinDate))) AS CalendarDate,
+	Week(Date(IterNo() + Date($(vMinDate)))) AS CalendarWeek,
+	Month(Date(IterNo() + Date($(vMinDate)))) AS CalendarMonth,
+	Year(Date(IterNo() + Date($(vMinDate)))) AS CalendarYear
+//	InYearToDate(Date(IterNo() + Date($(vMinDate))), Date($(vMaxDate)), 0) AS YTDFlag,
+//	InYearToDate(Date(IterNo() + Date($(vMinDate))), Date($(vMaxDate)), -1) AS LYFlag
+AutoGenerate 1 
+While Date(IterNo() + Date($(vMinDate))) <= Date($(vMaxDate));
