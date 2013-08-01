@@ -1,6 +1,6 @@
 QVSource Twitter Starter App For QlikView
 =========================================
-A template application showing how to get started using the [QVSource Twitter Connector](http://wiki.qvsource.com/Twitter-Connector-For-QlikView.ashx) for QlikView.
+A starter application showing how to get started using the [QVSource Twitter Connector](http://wiki.qvsource.com/Twitter-Connector-For-QlikView.ashx) for QlikView.
 
 Full documentation for this template application can be found [here](http://wiki.qvsource.com/Twitter-Tracker-Demo-Application-For-QlikView.ashx).
 
