@@ -764,7 +764,30 @@
     <OnActivateActionItems></OnActivateActionItems>
     <OnDeactivateActionItems></OnDeactivateActionItems>
     <Extension></Extension>
-    <Background></Background>
+    <Background>
+      <Color>
+        <Mode>COLORAREA_SOLID</Mode>
+        <Luminosity>85</Luminosity>
+        <FillDirection>COLORAREA_HORZ</FillDirection>
+        <FillPattern>COLORAREA_PATTERN1</FillPattern>
+        <PrimaryCol>
+          <Col>
+            <Red>0</Red>
+            <Green>0</Green>
+            <Blue>0</Blue>
+            <Alpha>255</Alpha>
+          </Col>
+          <IsCalculated>false</IsCalculated>
+          <ColorExpr></ColorExpr>
+        </PrimaryCol>
+        <SecondaryCol></SecondaryCol>
+        <Alpha>255</Alpha>
+      </Color>
+      <ImageBlob enctype="base64"></ImageBlob>
+      <ImageLayout></ImageLayout>
+      <UseColor>true</UseColor>
+      <UseImage>false</UseImage>
+    </Background>
     <MenuIcon>false</MenuIcon>
     <ExtendedProperties></ExtendedProperties>
     <ExtendedValues></ExtendedValues>

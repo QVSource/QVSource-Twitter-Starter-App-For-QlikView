@@ -1,5 +1,9 @@
 ﻿///$tab Notes
 /*
+v1.1.2 08/08/13
+---------------
+* Added Search_TweetType, Search_IsRetweet and Search_IsReply to data model.
+
 v1.1.1 01-03-13
 ---------------
 - Updated for data model 1.0.6
@@ -98,6 +102,9 @@ FROM '$(allTweets)' (qvd);
 Tweets_with_local:
 LOAD
 *,
+if(Search_in_reply_to_status_id <> '', 'Reply', if(Search_retweeted_status_id <> '', 'Retweet', 'Tweet')) as Search_TweetType, 
+if(Search_retweeted_status_id <> '', 'true', 'false') as Search_IsRetweet, 
+if(Search_in_reply_to_status_id <> '', 'true', 'false') as Search_IsReply, 
 makedate(year(Search_created_at_timestamp_local), month(Search_created_at_timestamp_local), day(Search_created_at_timestamp_local)) as Search_created_at_date_local
 resident
 Tweets;

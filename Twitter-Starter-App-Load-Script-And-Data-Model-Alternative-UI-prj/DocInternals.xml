@@ -538,46 +538,46 @@
     <String>Tweets</String>
     <String>175</String>
     <String>1</String>
-    <String>HashTags</String>
+    <String>Tweets</String>
     <String>176</String>
     <String>1</String>
-    <String>UserMentions</String>
+    <String>Tweets</String>
     <String>177</String>
     <String>1</String>
-    <String>Urls</String>
+    <String>Tweets</String>
     <String>178</String>
     <String>1</String>
-    <String>MediaLinks</String>
+    <String>HashTags</String>
     <String>179</String>
     <String>1</String>
-    <String>PhotoLinks</String>
+    <String>UserMentions</String>
     <String>180</String>
     <String>1</String>
-    <String>CalculatedTweetCount</String>
+    <String>Urls</String>
     <String>181</String>
     <String>1</String>
-    <String>Sentiment</String>
+    <String>MediaLinks</String>
     <String>182</String>
     <String>1</String>
-    <String>Sentiment</String>
+    <String>PhotoLinks</String>
     <String>183</String>
     <String>1</String>
-    <String>Sentiment</String>
+    <String>CalculatedTweetCount</String>
     <String>184</String>
     <String>1</String>
     <String>Sentiment</String>
     <String>185</String>
     <String>1</String>
-    <String>Klout</String>
+    <String>Sentiment</String>
     <String>186</String>
     <String>1</String>
-    <String>TrackedTwitterAccounts</String>
+    <String>Sentiment</String>
     <String>187</String>
     <String>1</String>
-    <String>TrackedTwitterAccounts</String>
+    <String>Sentiment</String>
     <String>188</String>
     <String>1</String>
-    <String>TrackedTwitterAccounts</String>
+    <String>Klout</String>
     <String>189</String>
     <String>1</String>
     <String>TrackedTwitterAccounts</String>
@@ -900,18 +900,18 @@
     <String>1</String>
     <String>TrackedTwitterAccounts</String>
     <String>296</String>
+    <String>1</String>
+    <String>TrackedTwitterAccounts</String>
+    <String>297</String>
+    <String>1</String>
+    <String>TrackedTwitterAccounts</String>
+    <String>298</String>
+    <String>1</String>
+    <String>TrackedTwitterAccounts</String>
+    <String>299</String>
     <String>2</String>
     <String>TrackedTwitterAccounts_Klout</String>
     <String>TwitterAccountsToTrack</String>
-    <String>297</String>
-    <String>1</String>
-    <String>TrackedTwitterAccounts_Klout</String>
-    <String>298</String>
-    <String>1</String>
-    <String>TrackedTwitterAccounts_Klout</String>
-    <String>299</String>
-    <String>1</String>
-    <String>TrackedTwitterAccounts_Klout</String>
     <String>300</String>
     <String>1</String>
     <String>TrackedTwitterAccounts_Klout</String>
@@ -940,25 +940,25 @@
     <String>1</String>
     <String>TrackedTwitterAccounts_Klout</String>
     <String>309</String>
+    <String>1</String>
+    <String>TrackedTwitterAccounts_Klout</String>
+    <String>310</String>
+    <String>1</String>
+    <String>TrackedTwitterAccounts_Klout</String>
+    <String>311</String>
+    <String>1</String>
+    <String>TrackedTwitterAccounts_Klout</String>
+    <String>312</String>
     <String>2</String>
     <String>TwitterSearchTerms</String>
     <String>TwitterAccountsToTrack</String>
-    <String>310</String>
-    <String>1</String>
-    <String>Tweets</String>
-    <String>311</String>
-    <String>2</String>
-    <String>Tweets</String>
-    <String>NewJoiners</String>
-    <String>312</String>
-    <String>1</String>
-    <String>Tweets</String>
     <String>313</String>
     <String>1</String>
     <String>Tweets</String>
     <String>314</String>
-    <String>1</String>
+    <String>2</String>
     <String>Tweets</String>
+    <String>NewJoiners</String>
     <String>315</String>
     <String>1</String>
     <String>Tweets</String>
@@ -969,22 +969,31 @@
     <String>1</String>
     <String>Tweets</String>
     <String>318</String>
+    <String>1</String>
+    <String>Tweets</String>
+    <String>319</String>
+    <String>1</String>
+    <String>Tweets</String>
+    <String>320</String>
+    <String>1</String>
+    <String>Tweets</String>
+    <String>321</String>
     <String>2</String>
     <String>Tweets</String>
     <String>MasterCalendar</String>
-    <String>319</String>
-    <String>1</String>
-    <String>NewJoiners</String>
-    <String>320</String>
-    <String>1</String>
-    <String>NewJoiners</String>
-    <String>321</String>
-    <String>1</String>
-    <String>MasterCalendar</String>
     <String>322</String>
     <String>1</String>
-    <String>MasterCalendar</String>
+    <String>NewJoiners</String>
     <String>323</String>
+    <String>1</String>
+    <String>NewJoiners</String>
+    <String>324</String>
+    <String>1</String>
+    <String>MasterCalendar</String>
+    <String>325</String>
+    <String>1</String>
+    <String>MasterCalendar</String>
+    <String>326</String>
     <String>1</String>
     <String>MasterCalendar</String>
   </FieldSrcTables>
@@ -995,8 +1004,8 @@
         <Tables>
           <TableViewTableWinSaveInfo>
             <Pos>
-              <Left>410</Left>
-              <Top>603</Top>
+              <Left>362</Left>
+              <Top>602</Top>
               <Width>100</Width>
               <Height>64</Height>
             </Pos>
@@ -1004,8 +1013,8 @@
           </TableViewTableWinSaveInfo>
           <TableViewTableWinSaveInfo>
             <Pos>
-              <Left>241</Left>
-              <Top>708</Top>
+              <Left>193</Left>
+              <Top>707</Top>
               <Width>100</Width>
               <Height>64</Height>
             </Pos>
@@ -1013,8 +1022,8 @@
           </TableViewTableWinSaveInfo>
           <TableViewTableWinSaveInfo>
             <Pos>
-              <Left>216</Left>
-              <Top>612</Top>
+              <Left>168</Left>
+              <Top>611</Top>
               <Width>100</Width>
               <Height>64</Height>
             </Pos>
@@ -1022,8 +1031,8 @@
           </TableViewTableWinSaveInfo>
           <TableViewTableWinSaveInfo>
             <Pos>
-              <Left>231</Left>
-              <Top>516</Top>
+              <Left>183</Left>
+              <Top>515</Top>
               <Width>100</Width>
               <Height>64</Height>
             </Pos>
@@ -1031,8 +1040,8 @@
           </TableViewTableWinSaveInfo>
           <TableViewTableWinSaveInfo>
             <Pos>
-              <Left>406</Left>
-              <Top>709</Top>
+              <Left>358</Left>
+              <Top>708</Top>
               <Width>100</Width>
               <Height>64</Height>
             </Pos>
@@ -1040,8 +1049,8 @@
           </TableViewTableWinSaveInfo>
           <TableViewTableWinSaveInfo>
             <Pos>
-              <Left>126</Left>
-              <Top>193</Top>
+              <Left>78</Left>
+              <Top>192</Top>
               <Width>187</Width>
               <Height>118</Height>
             </Pos>
@@ -1049,8 +1058,8 @@
           </TableViewTableWinSaveInfo>
           <TableViewTableWinSaveInfo>
             <Pos>
-              <Left>170</Left>
-              <Top>370</Top>
+              <Left>122</Left>
+              <Top>369</Top>
               <Width>149</Width>
               <Height>118</Height>
             </Pos>
@@ -1058,8 +1067,8 @@
           </TableViewTableWinSaveInfo>
           <TableViewTableWinSaveInfo>
             <Pos>
-              <Left>879</Left>
-              <Top>19</Top>
+              <Left>831</Left>
+              <Top>18</Top>
               <Width>237</Width>
               <Height>118</Height>
             </Pos>
@@ -1067,8 +1076,8 @@
           </TableViewTableWinSaveInfo>
           <TableViewTableWinSaveInfo>
             <Pos>
-              <Left>1254</Left>
-              <Top>43</Top>
+              <Left>1206</Left>
+              <Top>42</Top>
               <Width>301</Width>
               <Height>262</Height>
             </Pos>
@@ -1076,8 +1085,8 @@
           </TableViewTableWinSaveInfo>
           <TableViewTableWinSaveInfo>
             <Pos>
-              <Left>1234</Left>
-              <Top>324</Top>
+              <Left>1186</Left>
+              <Top>323</Top>
               <Width>311</Width>
               <Height>568</Height>
             </Pos>
@@ -1094,8 +1103,8 @@
           </TableViewTableWinSaveInfo>
           <TableViewTableWinSaveInfo>
             <Pos>
-              <Left>957</Left>
-              <Top>465</Top>
+              <Left>909</Left>
+              <Top>464</Top>
               <Width>188</Width>
               <Height>64</Height>
             </Pos>
@@ -1103,8 +1112,8 @@
           </TableViewTableWinSaveInfo>
           <TableViewTableWinSaveInfo>
             <Pos>
-              <Left>950</Left>
-              <Top>173</Top>
+              <Left>902</Left>
+              <Top>172</Top>
               <Width>196</Width>
               <Height>64</Height>
             </Pos>
@@ -1112,8 +1121,8 @@
           </TableViewTableWinSaveInfo>
           <TableViewTableWinSaveInfo>
             <Pos>
-              <Left>544</Left>
-              <Top>143</Top>
+              <Left>496</Left>
+              <Top>142</Top>
               <Width>298</Width>
               <Height>692</Height>
             </Pos>
@@ -1121,8 +1130,8 @@
           </TableViewTableWinSaveInfo>
           <TableViewTableWinSaveInfo>
             <Pos>
-              <Left>944</Left>
-              <Top>262</Top>
+              <Left>896</Left>
+              <Top>261</Top>
               <Width>205</Width>
               <Height>82</Height>
             </Pos>
@@ -1130,8 +1139,8 @@
           </TableViewTableWinSaveInfo>
           <TableViewTableWinSaveInfo>
             <Pos>
-              <Left>944</Left>
-              <Top>358</Top>
+              <Left>896</Left>
+              <Top>357</Top>
               <Width>205</Width>
               <Height>100</Height>
             </Pos>
@@ -1214,8 +1223,8 @@
         <ConnectionPoints>
           <TableViewConnectionPointSaveInfo>
             <Pos>
-              <x>404</x>
-              <y>480</y>
+              <x>356</x>
+              <y>479</y>
             </Pos>
             <Fields>
               <String>Search_id</String>
@@ -1363,6 +1372,9 @@
           <String>Search_retweeted_status_place_attributes</String>
           <String>Search_retweeted_status_geo_type</String>
           <String>Search_retweeted_status_coordinates_type</String>
+          <String>Search_TweetType</String>
+          <String>Search_IsRetweet</String>
+          <String>Search_IsReply</String>
           <String>UserMention</String>
           <String>MediaUrl</String>
           <String>PhotoUrl</String>
@@ -1462,6 +1474,7 @@
           <String>Search_created_at_date_hour_local</String>
           <String>Search_created_at_date_hour_min_local</String>
           <String>NewJoin_User</String>
+          <String>NewJoin</String>
         </FieldNames>
       </FieldTagData>
       <FieldTagData>
@@ -1571,6 +1584,9 @@
           <String>Search_retweeted_status_place_attributes</String>
           <String>Search_retweeted_status_geo_type</String>
           <String>Search_retweeted_status_coordinates_type</String>
+          <String>Search_TweetType</String>
+          <String>Search_IsRetweet</String>
+          <String>Search_IsReply</String>
           <String>HashTagLowerCase</String>
           <String>UserMention</String>
           <String>Url</String>
@@ -1674,6 +1690,7 @@
           <String>Search_created_at_date_hour_local</String>
           <String>Search_created_at_date_hour_min_local</String>
           <String>NewJoin_User</String>
+          <String>NewJoin</String>
         </FieldNames>
       </FieldTagData>
       <FieldTagData>
@@ -1765,7 +1782,6 @@
           <String>ResponseTimeSec</String>
           <String>NowInterval</String>
           <String>CalendarDate</String>
-          <String>NewJoin</String>
           <String>CalendarWeek</String>
           <String>CalendarMonth</String>
           <String>CalendarYear</String>
@@ -1838,7 +1854,6 @@
           <String>TrackedAccount_KloutEnd</String>
           <String>NowInterval</String>
           <String>CalendarDate</String>
-          <String>NewJoin</String>
           <String>CalendarWeek</String>
           <String>CalendarMonth</String>
           <String>CalendarYear</String>
