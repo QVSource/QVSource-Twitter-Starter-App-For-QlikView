@@ -12,6 +12,9 @@ The content below is copied from the change log in the first tab of the load scr
 
 Change Log
 ==========
+1.0.8.2 - 29/08/13
+------------------
+* maxCacheAgeInHours parameter for UserLookup table changed from -1 (cache indefintely to 1 (hour).
 
 1.0.8.1 - 30/07/13
 ------------------
