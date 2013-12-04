@@ -12,6 +12,10 @@ The content below is copied from the change log in the first tab of the load scr
 
 Change Log
 ==========
+1.0.8.3 - 04/12/13
+------------------
+* Updated badge.
+
 1.0.8.2 - 29/08/13
 ------------------
 * maxCacheAgeInHours parameter for UserLookup table changed from -1 (cache indefinitely) to 1 (hour).
