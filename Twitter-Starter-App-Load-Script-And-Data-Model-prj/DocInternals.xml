@@ -1418,7 +1418,7 @@
       <ForAnnotations>false</ForAnnotations>
     </Bookmark>
   </Bookmarks>
-  <SavedByVersion>11.00.11282.0409</SavedByVersion>
+  <SavedByVersion>11.20.12577.0409</SavedByVersion>
   <ForceBackEndMacroExecution>false</ForceBackEndMacroExecution>
   <FieldTags>
     <ScriptBased>
@@ -1470,6 +1470,7 @@
           <String>Search_truncated</String>
           <String>Search_in_reply_to_screen_name</String>
           <String>Search_in_reply_to_status_id</String>
+          <String>Search_expanded_urls</String>
           <String>Search_user_mentions</String>
           <String>Search_media_expanded_urls</String>
           <String>Search_symbols</String>
@@ -1512,12 +1513,12 @@
           <String>TrackedTwitterAccounts_user_notifications</String>
           <String>TrackedTwitterAccounts_status_id</String>
           <String>TrackedTwitterAccounts_status_created_at</String>
-          <String>TrackedTwitterAccounts_status_text</String>
           <String>TrackedTwitterAccounts_status_lang</String>
           <String>TrackedTwitterAccounts_status_source</String>
           <String>TrackedTwitterAccounts_status_truncated</String>
           <String>TrackedTwitterAccounts_status_in_reply_to_screen_name</String>
           <String>TrackedTwitterAccounts_status_in_reply_to_status_id</String>
+          <String>TrackedTwitterAccounts_status_in_reply_to_user_id</String>
           <String>TrackedTwitterAccounts_status_retweeted</String>
           <String>TrackedTwitterAccounts_status_favorited</String>
           <String>TrackedTwitterAccounts_status_possibly_sensitive</String>
@@ -1543,9 +1544,6 @@
           <String>TrackedTwitterAccounts_status_coordinates_longitude</String>
           <String>TrackedTwitterAccounts_status_retweeted_status_id</String>
           <String>TrackedTwitterAccounts_status_retweeted_status_created_at</String>
-          <String>TrackedTwitterAccounts_status_retweeted_status_created_at_timestamp</String>
-          <String>TrackedTwitterAccounts_status_retweeted_status_created_at_date</String>
-          <String>TrackedTwitterAccounts_status_retweeted_status_created_at_time</String>
           <String>TrackedTwitterAccounts_status_retweeted_status_text</String>
           <String>TrackedTwitterAccounts_status_retweeted_status_lang</String>
           <String>TrackedTwitterAccounts_status_retweeted_status_source</String>
@@ -1553,7 +1551,6 @@
           <String>TrackedTwitterAccounts_status_retweeted_status_in_reply_to_screen_name</String>
           <String>TrackedTwitterAccounts_status_retweeted_status_in_reply_to_status_id</String>
           <String>TrackedTwitterAccounts_status_retweeted_status_in_reply_to_user_id</String>
-          <String>TrackedTwitterAccounts_status_retweeted_status_retweet_count</String>
           <String>TrackedTwitterAccounts_status_retweeted_status_retweeted</String>
           <String>TrackedTwitterAccounts_status_retweeted_status_favorited</String>
           <String>TrackedTwitterAccounts_status_retweeted_status_possibly_sensitive</String>
@@ -1603,6 +1600,7 @@
           <String>Search_media_photo_urls</String>
           <String>Search_user_name</String>
           <String>Search_user_screen_name</String>
+          <String>Search_user_location</String>
           <String>Search_user_profile_image_url</String>
           <String>Search_user_created_at</String>
           <String>Search_user_time_zone</String>
@@ -1615,7 +1613,6 @@
           <String>HashTagLowerCase</String>
           <String>SymbolsLowerCase</String>
           <String>UserMention</String>
-          <String>Url</String>
           <String>MediaUrl</String>
           <String>PhotoUrl</String>
           <String>SentimentEngine</String>
@@ -1649,6 +1646,7 @@
           <String>TrackedTwitterAccounts_status_truncated</String>
           <String>TrackedTwitterAccounts_status_in_reply_to_screen_name</String>
           <String>TrackedTwitterAccounts_status_in_reply_to_status_id</String>
+          <String>TrackedTwitterAccounts_status_in_reply_to_user_id</String>
           <String>TrackedTwitterAccounts_status_retweeted</String>
           <String>TrackedTwitterAccounts_status_favorited</String>
           <String>TrackedTwitterAccounts_status_possibly_sensitive</String>
@@ -1674,9 +1672,6 @@
           <String>TrackedTwitterAccounts_status_coordinates_longitude</String>
           <String>TrackedTwitterAccounts_status_retweeted_status_id</String>
           <String>TrackedTwitterAccounts_status_retweeted_status_created_at</String>
-          <String>TrackedTwitterAccounts_status_retweeted_status_created_at_timestamp</String>
-          <String>TrackedTwitterAccounts_status_retweeted_status_created_at_date</String>
-          <String>TrackedTwitterAccounts_status_retweeted_status_created_at_time</String>
           <String>TrackedTwitterAccounts_status_retweeted_status_text</String>
           <String>TrackedTwitterAccounts_status_retweeted_status_lang</String>
           <String>TrackedTwitterAccounts_status_retweeted_status_source</String>
@@ -1684,7 +1679,6 @@
           <String>TrackedTwitterAccounts_status_retweeted_status_in_reply_to_screen_name</String>
           <String>TrackedTwitterAccounts_status_retweeted_status_in_reply_to_status_id</String>
           <String>TrackedTwitterAccounts_status_retweeted_status_in_reply_to_user_id</String>
-          <String>TrackedTwitterAccounts_status_retweeted_status_retweet_count</String>
           <String>TrackedTwitterAccounts_status_retweeted_status_retweeted</String>
           <String>TrackedTwitterAccounts_status_retweeted_status_favorited</String>
           <String>TrackedTwitterAccounts_status_retweeted_status_possibly_sensitive</String>
@@ -1728,7 +1722,6 @@
           <String>Search_user_friends_count</String>
           <String>Search_user_listed_count</String>
           <String>Search_user_statuses_count</String>
-          <String>Search_user_utc_offset</String>
           <String>Search_created_at_date_local</String>
           <String>sentiment_score</String>
           <String>KloutScore_score</String>
@@ -1748,10 +1741,7 @@
           <String>TrackedTwitterAccounts_user_created_at_timestamp</String>
           <String>TrackedTwitterAccounts_user_created_at_date</String>
           <String>TrackedTwitterAccounts_user_created_at_time</String>
-          <String>TrackedTwitterAccounts_user_utc_offset</String>
-          <String>TrackedTwitterAccounts_status_created_at_timestamp</String>
           <String>TrackedTwitterAccounts_status_created_at_date</String>
-          <String>TrackedTwitterAccounts_status_created_at_time</String>
           <String>TrackedTwitterAccounts_status_retweet_count</String>
           <String>TrackedTwitterAccounts_status_hashtag_count</String>
           <String>TrackedTwitterAccounts_status_url_count</String>
@@ -1782,7 +1772,6 @@
           <String>Search_user_friends_count</String>
           <String>Search_user_listed_count</String>
           <String>Search_user_statuses_count</String>
-          <String>Search_user_utc_offset</String>
           <String>Search_created_at_date_local</String>
           <String>sentiment_score</String>
           <String>TrackedTwitterAccounts_Klout_date</String>
@@ -1793,7 +1782,6 @@
           <String>TrackedTwitterAccounts_user_favourites_count</String>
           <String>TrackedTwitterAccounts_user_statuses_count</String>
           <String>TrackedTwitterAccounts_user_created_at_date</String>
-          <String>TrackedTwitterAccounts_user_utc_offset</String>
           <String>TrackedTwitterAccounts_status_created_at_date</String>
           <String>TrackedTwitterAccounts_status_retweet_count</String>
           <String>TrackedTwitterAccounts_status_hashtag_count</String>
@@ -1818,8 +1806,6 @@
           <String>TrackedTwitterAccounts_timestamp</String>
           <String>TrackedTwitterAccounts_user_created_at_timestamp</String>
           <String>TrackedTwitterAccounts_user_created_at_date</String>
-          <String>TrackedTwitterAccounts_status_created_at_timestamp</String>
-          <String>TrackedTwitterAccounts_status_created_at_date</String>
         </FieldNames>
       </FieldTagData>
       <FieldTagData>
@@ -1828,7 +1814,6 @@
           <String>Search_created_at_date_local</String>
           <String>TrackedTwitterAccounts_Klout_date</String>
           <String>TrackedTwitterAccounts_user_created_at_date</String>
-          <String>TrackedTwitterAccounts_status_created_at_date</String>
         </FieldNames>
       </FieldTagData>
     </ScriptBased>
@@ -1912,4 +1897,5 @@
   <FieldComments></FieldComments>
   <TableComments></TableComments>
   <CreatePrjFolder>false</CreatePrjFolder>
+  <LinkedTables></LinkedTables>
 </DocInternals>

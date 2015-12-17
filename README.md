@@ -16,6 +16,10 @@ The content below is copied from the change log in the first tab of the load scr
 
 Change Log
 ==========
+1.0.9.0 - 17/12/15
+------------------
+* Made change outlined here [http://wiki.qvsource.com/Upgrading-to-version-1_1-of-the-Sentiment-Analysis-And-Text-Analytics-Connector.ashx] to make app compatible with QVSource Web Editios and QVSource WinForms Edition 1.6.7.0 and later.
+
 1.0.8.3 - 04/12/13
 ------------------
 * Updated badge.

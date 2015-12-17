@@ -2,6 +2,10 @@
 let vVersion = '1.0.8';
 
 /*
+1.0.9.0 - 17/12/15
+------------------
+* Made change outlined here [http://wiki.qvsource.com/Upgrading-to-version-1_1-of-the-Sentiment-Analysis-And-Text-Analytics-Connector.ashx] to make app compatible with QVSource Web Editios and QVSource WinForms Edition 1.6.7.0 and later.
+
 1.0.8.3 - 04/12/13
 ------------------
 * Updated badge.
@@ -994,8 +998,7 @@ sub getSentiment
 		Params_Sentiment:
 		load
 		StillToScore_Search_id as rowKey,
-		StillToScore_Search_text as text,
-		'$(engineToUse)' as api
+		StillToScore_Search_text as text
 		resident
 		StillToScore;
 		
@@ -1015,7 +1018,7 @@ sub getSentiment
 		    status as sentiment_status,
 		    score as sentiment_score
 		FROM
-		[http://localhost:$(vQVSourcePort)/QVSource/TextAnalyserV2/?table=Sentiment&processParams$(vProcessParam)=$(vParamsFile)&format=qvx&appID=$(vQVSourceAppId)]
+		[http://localhost:$(vQVSourcePort)/QVSource/TextAnalyserV2/?table=Sentiment_$(engine)&processParams$(vProcessParam)=$(vParamsFile)&format=qvx&appID=$(vQVSourceAppId)]
 		(qvx)
 		where status = 'OK';
 
@@ -1039,8 +1042,7 @@ sub getKeywords
 	Params_Keywords:
 	load
 	Search_id as rowKey,
-	Search_text as text,
-	'AlchemyAPI' as api
+	Search_text as text
 	resident
 	TwitterSearch;
 	
@@ -1060,7 +1062,7 @@ sub getKeywords
 		sentiment_type as KeywordsWithSentiment_sentiment_type,
 		sentiment_score as KeywordsWithSentiment_sentiment_score
 	FROM
-	[http://localhost:$(vQVSourcePort)/QVSource/TextAnalyserV2/?table=KeywordsWithSentiment&processParamsAsync=$(vParamsFile)&format=qvx&appID=$(vQVSourceAppId)]
+	[http://localhost:$(vQVSourcePort)/QVSource/TextAnalyserV2/?table=Keywords_AlchemyAPIWithSentiment&processParamsAsync=$(vParamsFile)&format=qvx&appID=$(vQVSourceAppId)]
 	(qvx);
 
 	STORE SentimentForKeywords INTO 'Keywords.qvd';

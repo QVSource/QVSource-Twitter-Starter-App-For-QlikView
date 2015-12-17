@@ -213,6 +213,7 @@
       <v>Keywords, Relevance and Sentiment (From AlchemyAPI)</v>
     </WindowTitle>
     <GraphMode>GRAPH_MODE_STRAIGHTTABLE</GraphMode>
+    <TotalString></TotalString>
     <ErrorMessageOverrides>
       <StringExpr></StringExpr>
       <StringExpr></StringExpr>
@@ -2119,7 +2120,6 @@
     <SheetPrintDrawBackGround>false</SheetPrintDrawBackGround>
     <StrDevModeExtra></StrDevModeExtra>
   </PrintSettings>
-  <ActivePropertyPage>0</ActivePropertyPage>
   <DoctorSpecial>0</DoctorSpecial>
   <DoctorMapField></DoctorMapField>
   <Detached>false</Detached>
@@ -3268,6 +3268,9 @@
     <DynamicImage></DynamicImage>
     <TrellisProperties></TrellisProperties>
     <MekkoChartMode>MEKKOCHART_NORMALIZED</MekkoChartMode>
+    <TruncateLabel>true</TruncateLabel>
+    <ScaleChartSizeRects></ScaleChartSizeRects>
+    <FastChangeRefSizeRect></FastChangeRefSizeRect>
   </ChartProperties>
   <TableProperties>
     <VerticalLabels>false</VerticalLabels>

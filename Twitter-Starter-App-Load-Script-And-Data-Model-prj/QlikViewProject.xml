@@ -1,4 +1,4 @@
-﻿<!-- Last project change: 2013-12-04 11:26:21 (2013-12-04 10:26:21) -->
+﻿<!-- Last project change: 2015-12-17 15:13:21 (2015-12-17 15:13:21) -->
 <PrjQlikViewProject>
   <GLOBAL>
     <AllPropertiesFileName>AllProperties.xml</AllPropertiesFileName>
@@ -2126,6 +2126,10 @@
         <String>Document\CH04</String>
         <String>Document\CH05</String>
       </ObjectIds>
+      <ObjectLabels>
+        <StringExpr></StringExpr>
+        <StringExpr></StringExpr>
+      </ObjectLabels>
     </PrjContainerMembers>
     <PrjContainerMembers>
       <ParentObjectId>Document\CT02</ParentObjectId>
@@ -2135,6 +2139,12 @@
         <String>Document\CH16</String>
         <String>Document\CH_TWEETES_RETWEETS</String>
       </ObjectIds>
+      <ObjectLabels>
+        <StringExpr></StringExpr>
+        <StringExpr></StringExpr>
+        <StringExpr></StringExpr>
+        <StringExpr></StringExpr>
+      </ObjectLabels>
     </PrjContainerMembers>
   </ContainerMembers>
 </PrjQlikViewProject>
